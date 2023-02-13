@@ -21,6 +21,7 @@ setup(
     entry_points={
         'console_scripts': [
             'gap_follow = tigerstack.gap_follow:main'
+            'safety_node = tigerstack.safety_node:main'
         ],
     },
 )
