@@ -38,18 +38,20 @@ class ReactiveFollowGap(Node):
         lidarscan_topic = "/scan"
         drive_topic = "/drive"
 
-        self.max_range = 4.0
+        self.max_range = 3.0
         self.filter_width = 5
         self.bubble_radius = 0.3
-        self.disparity_threshold = 0.2
-        self.turn_threshold = 0.1
+        self.disparity_threshold = 0.1
+        self.turn_threshold = 0.2
 
-        self.speed_min = 0.25
-        self.speed_max = 3.0
-        self.speed_min_distance = 0.3
-        self.speed_max_distance = 2.0
+        self.stop_distance = 0.2
+        self.speed_min = 1.5
+        self.speed_max = 6.0
+        self.speed_min_distance = 1.0
+        self.speed_max_distance = 8.0
+        self.speed_angle = np.pi / 30
 
-        self.pid = PID(1.0, 0.0, 1e-3)
+        self.pid = PID(0.5, 1e-5, 1e-5)
         self.last_time = self.get_clock().now().nanoseconds / 1e9
 
         self.create_subscription(LaserScan, lidarscan_topic, self.lidar_callback, 10)
@@ -126,8 +128,10 @@ class ReactiveFollowGap(Node):
         start, end = self.find_widest_range(close_to_max)
         return int((start + end) / 2)
 
-    def compute_speed(self, distance):
-        if distance < self.speed_min_distance:
+    def compute_speed(self, distance) -> float:
+        if distance < self.stop_distance:
+            return 0.0
+        elif distance < self.speed_min_distance:
             return self.speed_min
         elif distance > self.speed_max_distance:
             return self.speed_max
@@ -171,6 +175,9 @@ class ReactiveFollowGap(Node):
         angles = np.arange(data.angle_min, data.angle_max, data.angle_increment)
         ranges = np.asarray(data.ranges)
 
+        # run on raw lidar data
+        obstacle_distance = np.percentile(ranges[np.abs(angles) < self.speed_angle], 5)
+
         # Get angles between -90 and 90 degrees
         mask = np.abs(angles) < np.pi / 2
 
@@ -196,8 +203,6 @@ class ReactiveFollowGap(Node):
             if distance_behind_right < self.turn_threshold and steering_angle < 0:
                 steering_angle = 0.0
             drive_msg.drive.steering_angle = steering_angle
-
-            obstacle_distance = np.min(ranges[np.abs(angles) < np.pi / 6])
             drive_msg.drive.speed = self.compute_speed(obstacle_distance)
 
         self.drive_pub.publish(drive_msg)
