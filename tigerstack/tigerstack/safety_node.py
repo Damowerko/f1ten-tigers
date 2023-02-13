@@ -127,6 +127,7 @@ class SafetyNode(Node):
             self.publisher_drive.publish(
                 AckermannDriveStamped(drive=AckermannDrive(speed=0.0))
             )
+            node.get_logger().warn("Safety node triggered.")
 
 
 def main(args=None):
