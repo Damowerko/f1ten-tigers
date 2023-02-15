@@ -40,14 +40,14 @@ class ReactiveFollowGap(Node):
 
         self.max_range = 3.0
         self.filter_width = 5
-        self.bubble_radius = 0.3
+        self.bubble_radius = 0.4
         self.disparity_threshold = 0.1
         self.turn_threshold = 0.2
 
         self.stop_distance = 0.2
         self.speed_min = 1.5
-        self.speed_max = 6.0
-        self.speed_min_distance = 1.0
+        self.speed_max = 4.0
+        self.speed_min_distance = 2.0
         self.speed_max_distance = 8.0
         self.speed_angle = np.pi / 30
 
