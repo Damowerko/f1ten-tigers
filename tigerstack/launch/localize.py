@@ -142,7 +142,7 @@ def generate_launch_description():
     ld.add_action(ekf_node)
     ld.add_action(nav_lifecycle_node)
     ld.add_action(map_server_node)
-    ld.add_action(imu_framer)
-    ld.add_action(pf_node)
+    # ld.add_action(imu_framer)
+    # ld.add_action(pf_node)
 
     return ld
