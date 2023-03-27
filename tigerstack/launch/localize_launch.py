@@ -80,8 +80,61 @@ def generate_launch_description():
             {"node_names": ["map_server"]},
         ],
     )
+    ekf_node = Node(
+        package="robot_localization",
+        executable="ekf_node",
+        name="localization",
+        parameters=[
+            {"imu0": "/sensors/imu/raw"},
+            {"odom0": "/odom"},
+            {"world_frame": "odom"},
+            {"odom_frame": "odom"},
+            {"frequency": 50.0},
+            {"two_d_mode": True},
+            {"publish_tf": False},
+            {
+                "imu0_config": [
+                    False,
+                    False,
+                    False,
+                    False,
+                    False,
+                    True,
+                    False,
+                    False,
+                    False,
+                    False,
+                    False,
+                    True,
+                    True,
+                    False,
+                    False,
+                ]
+            },
+            {
+                "odom0_config": [
+                    True,
+                    True,
+                    False,
+                    False,
+                    False,
+                    True,
+                    True,
+                    False,
+                    False,
+                    False,
+                    False,
+                    True,
+                    False,
+                    False,
+                    False,
+                ]
+            },
+        ],
+    )
 
     # finalize
+    ld.add_action(ekf_node)
     ld.add_action(nav_lifecycle_node)
     ld.add_action(map_server_node)
     ld.add_action(pf_node)
