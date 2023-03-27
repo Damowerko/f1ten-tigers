@@ -27,6 +27,7 @@ setup(
         "console_scripts": [
             "gap_follow = tigerstack.gap_follow:main",
             "safety_node = tigerstack.safety_node:main",
+            "imu_framer = tigerstack.imu_framer:main",
         ],
     },
 )

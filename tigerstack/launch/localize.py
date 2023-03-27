@@ -80,12 +80,17 @@ def generate_launch_description():
             {"node_names": ["map_server"]},
         ],
     )
+    imu_framer = Node(
+        package="tigerstack",
+        executable="imu_framer",
+        name="imu_framer",
+    )
     ekf_node = Node(
         package="robot_localization",
         executable="ekf_node",
         name="localization",
         parameters=[
-            {"imu0": "/sensors/imu/raw"},
+            {"imu0": "/sensors/imu/raw_framed"},
             {"odom0": "/odom"},
             {"world_frame": "odom"},
             {"odom_frame": "odom"},
@@ -137,6 +142,7 @@ def generate_launch_description():
     ld.add_action(ekf_node)
     ld.add_action(nav_lifecycle_node)
     ld.add_action(map_server_node)
+    ld.add_action(imu_framer)
     ld.add_action(pf_node)
 
     return ld
