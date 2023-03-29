@@ -4,11 +4,11 @@ particle_filter:
     scan_topic: '/scan'
     odometry_topic: '/odom'
     # range data downsampling
-    angle_step: 18
-    max_particles: 500
+    angle_step: 9
+    max_particles: 1000
     squash_factor: 2.2
     # visualization
-    viz: 1
+    viz: 0
     max_viz_particles: 60
     # ray marching method
     range_method: 'rmgpu'
@@ -25,8 +25,8 @@ particle_filter:
     sigma_hit: 8.0
     # motion model dispersion constants
     motion_dispersion_x: 0.05
-    motion_dispersion_y: 0.025
-    motion_dispersion_theta: 0.25
+    motion_dispersion_y: 0.05
+    motion_dispersion_theta: 0.5
     # sensor model variant, variant 2 good for rmgpu, 3 doesn't work for rmgpu
     rangelib_variant: 2
 
