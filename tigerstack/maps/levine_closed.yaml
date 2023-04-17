@@ -1,0 +1,9 @@
+image: levine_closed.pgm
+mode: trinary
+resolution: 0.05
+# origin: [13.36, -18.48, 0.8377588041]
+# origin: [ -3.7,27.2, -2.3038346]
+origin: [-3.67,26.86 ,-2.3038346 ] 
+negate: 0
+occupied_thresh: 0.65
+free_thresh: 0.25
