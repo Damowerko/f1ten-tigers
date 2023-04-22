@@ -3,19 +3,18 @@ import math
 from dataclasses import dataclass, field
 
 import cvxpy
-import mpc.waypoints
 import numpy as np
 import numpy.typing as npt
 import rclpy
 from ackermann_msgs.msg import AckermannDriveStamped
 from ament_index_python.packages import get_package_share_directory
-from mpc import visualize
-from mpc.utils import nearest_point
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from scipy.linalg import block_diag
 from scipy.sparse import block_diag, csc_matrix
 from scipy.spatial.transform import Rotation
+from tigerstack.mpc import visualize, waypoints
+from tigerstack.mpc.utils import nearest_point
 from visualization_msgs.msg import MarkerArray
 
 
@@ -101,9 +100,9 @@ class MPC(Node):
 
         # load waypoints assuming constant speed
         waypoints_filename = (
-            get_package_share_directory("mpc") + "/maps/levine_mintime_4ay.csv"
+            get_package_share_directory("tigerstack") + "/maps/outside_traj_race_cl.csv"
         )
-        self.waypoints, self.optimal_trajectory = mpc.waypoints.load_waypoints(
+        self.waypoints, self.optimal_trajectory = waypoints.load_waypoints(
             waypoints_filename
         )
         self.lap_length = self.waypoints[-1, 0]

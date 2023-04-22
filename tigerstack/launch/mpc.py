@@ -18,12 +18,12 @@ def generate_launch_description():
         [
             sim_arg,
             Node(
-                package="mpc",
+                package="tigerstack",
                 executable="mpc_node",
                 name="mpc_node",
                 parameters=[
                     {"sim": LaunchConfiguration("sim")},
-                ]
-            )
+                ],
+            ),
         ]
     )
