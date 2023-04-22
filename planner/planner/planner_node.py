@@ -1,34 +1,19 @@
 #!/usr/bin/env python3
-import json
 import time
 
 import graph_ltpl
 import numpy as np
 import rclpy
-from ackermann_msgs.msg import AckermannDrive, AckermannDriveStamped
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
-from sensor_msgs.msg import LaserScan
 from std_msgs.msg import Float32MultiArray
-from tf2_msgs.msg import TFMessage
-from visualization_msgs.msg import Marker, MarkerArray
-
-# import configparser
-
-
-# ----------------------------------------------------------------------------------------------------------------------
-# IMPORT (should not change) -------------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------------------------------------
-# top level path (module directory)
-# import os
-# import sys
-# toppath = os.path.dirname(os.path.realpath(__file__))
-# sys.path.append(toppath)
 
 # track_param = configparser.ConfigParser()
 # if not track_param.read(toppath + "/params/driving_task.ini"):
 #     raise ValueError('Specified online parameter config file does not exist or is empty!')
-toppath = "/sim_ws/src/planner"
+
+
+toppath = "f1ten_ws/src/f1ten-tigers/planner"
 track_specifier = "skir"
 
 # define all relevant paths
@@ -55,16 +40,8 @@ class Planner(Node):
     """
 
     def __init__(self):
-        super().__init__("planner_node")
-        # TODO: create ROS subscribers and publishers
-        # self.publisher_marker = self.create_publisher(MarkerArray, 'visualization_marker_array', 10)
-        # self.scan_sub = self.create_subscription(TFMessage,'tf',self.pose_callback_sim,10)
-        # self.drive_pub = self.create_publisher(AckermannDriveStamped, 'drive', 10)
-        # self.L = L
-        # self.wypts = np.loadtxt(FILENAME,delimiter=",", dtype=str)
-        # self.get_logger().info("waypoints size=%d"%self.wypts.shape[0])
-        # self.markerMsg = MarkerArray()
-        # self.kp = KP
+        super().__init__("planner_node")  # type: ignore
+
         self.sim = True
         self.timer = self.create_timer(0.05, self.timer_callback)
         self.publisher_array = self.create_publisher(Float32MultiArray, "/localpath", 1)
@@ -79,7 +56,7 @@ class Planner(Node):
 
         # intialize graph_ltpl-class
         self.ltpl_obj = graph_ltpl.Graph_LTPL.Graph_LTPL(
-            path_dict=path_dict, visual_mode=True, log_to_file=False
+            path_dict=path_dict, log_to_file=False
         )
 
         # calculate offline graph
@@ -102,33 +79,13 @@ class Planner(Node):
         self.traj_set = {"straight": None}
         self.tic = time.time()
 
-        # self.tf_sub =   self.create_subscription(
-        #     TFMessage,
-        #     'tf',
-        #     self.pose_callback_sim,
-        #     10)
-        # self.tf_sub
-
-        # self.odom_sub = self.create_subscription(
-        #     Odometry,
-        #     'ego_racecar/odom',     # Self defined topic
-        #     self.odom_callback,
-        #     10)
-        # self.odom_sub
-
         self.vel_est = 0
         self.pos_est = [0, 0]
 
     def odom_callback(self, odom_msg):
-        # self.get_logger().info("odom twist lx:%.5f"% odom_msg.twist.twist.linear.x)
         self.vel_est = odom_msg.twist.twist.linear.x
         position = odom_msg.pose.pose.position
         self.pos_est = [position.x, position.y]
-
-    # def pose_callback_sim(self, pose_msg):
-    #     for tf in pose_msg.transforms:
-    #         if tf.header.frame_id=="map":
-    #             self.pos_est = [tf.transform.translation.x,tf.transform.translation.y]
 
     def timer_callback(self):
         for sel_action in [
@@ -140,18 +97,8 @@ class Planner(Node):
             if sel_action in self.traj_set.keys():
                 break
 
-        # -- CALCULATE PATHS FOR NEXT TIMESTAMP ----------------------------------------------------------------------------
         self.ltpl_obj.calc_paths(prev_action_id=sel_action, object_list=[])
 
-        # -- GET POSITION AND VELOCITY ESTIMATE OF EGO-VEHICLE -------------------------------------------------------------
-        # (here: simulation dummy, replace with actual sensor readings)
-        # if self.traj_set[sel_action] is not None:
-        #     self.pos_est, self.vel_est = graph_ltpl.testing_tools.src.vdc_dummy.\
-        #         vdc_dummy(pos_est=self.pos_est,
-        #                 last_s_course=(self.traj_set[sel_action][0][:, 0]),
-        #                 last_path=(self.traj_set[sel_action][0][:, 1:3]),
-        #                 last_vel_course=(self.traj_set[sel_action][0][:, 5]),
-        #                 iter_time=time.time() - self.tic)
         self.tic = time.time()
 
         # -- CALCULATE VELOCITY PROFILE AND RETRIEVE TRAJECTORIES ----------------------------------------------------------
@@ -188,12 +135,9 @@ class Planner(Node):
 
 def main(args=None):
     rclpy.init(args=args)
-    print("planner Initialized")
     planner_node = Planner()
-    # for i in range(0,1):
-    #     planner_node.visualizeWaypoints()
+    print("Planner Initialized")
     rclpy.spin(planner_node)
-
     planner_node.destroy_node()
     rclpy.shutdown()
 
