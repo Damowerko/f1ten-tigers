@@ -1,0 +1,66 @@
+time;type;message
+1682122175.9713418;WARNING;Warning: One trajectory generation iteration took more than 0.110s (Actual calculation time: 0.114s)
+1682122177.018522;WARNING;Velocity profile generation did not match the inserted boundary conditions! (Action Set: straight, Offset: -0.50m/s)
+1682122177.0194886;WARNING;Detected iterative infeasibility and triggered deceleration on old path!
+1682122177.0911844;WARNING;Velocity profile generation did not match the inserted boundary conditions! (Action Set: straight, Offset: -0.56m/s)
+1682122177.0920537;WARNING;Detected iterative infeasibility and triggered deceleration on old path!
+1682122177.1398635;WARNING;Velocity profile generation did not match the inserted boundary conditions! (Action Set: straight, Offset: -0.60m/s)
+1682122177.140897;WARNING;Detected iterative infeasibility and triggered deceleration on old path!
+1682122177.209467;WARNING;Velocity profile generation did not match the inserted boundary conditions! (Action Set: straight, Offset: -0.70m/s)
+1682122177.2102494;WARNING;Detected iterative infeasibility and triggered deceleration on old path!
+1682122177.261925;WARNING;Velocity profile generation did not match the inserted boundary conditions! (Action Set: straight, Offset: -0.70m/s)
+1682122177.262826;WARNING;Detected iterative infeasibility and triggered deceleration on old path!
+1682122177.3303244;WARNING;Velocity profile generation did not match the inserted boundary conditions! (Action Set: straight, Offset: -0.70m/s)
+1682122177.3312483;WARNING;Detected iterative infeasibility and triggered deceleration on old path!
+1682122177.3772008;WARNING;Velocity profile generation did not match the inserted boundary conditions! (Action Set: straight, Offset: -0.70m/s)
+1682122177.377953;WARNING;Detected iterative infeasibility and triggered deceleration on old path!
+1682122177.4464242;WARNING;Velocity profile generation did not match the inserted boundary conditions! (Action Set: straight, Offset: -0.70m/s)
+1682122179.4635146;WARNING;Velocity profile generation did not match the inserted boundary conditions! (Action Set: straight, Offset: -0.29m/s)
+1682122179.4645927;WARNING;Detected iterative infeasibility and triggered deceleration on old path!
+1682122179.5317605;WARNING;Velocity profile generation did not match the inserted boundary conditions! (Action Set: straight, Offset: -0.32m/s)
+1682122179.5328505;WARNING;Detected iterative infeasibility and triggered deceleration on old path!
+1682122179.5822043;WARNING;Velocity profile generation did not match the inserted boundary conditions! (Action Set: straight, Offset: -0.32m/s)
+1682122179.5832756;WARNING;Detected iterative infeasibility and triggered deceleration on old path!
+1682122179.6510782;WARNING;Velocity profile generation did not match the inserted boundary conditions! (Action Set: straight, Offset: -0.35m/s)
+1682122179.651917;WARNING;Detected iterative infeasibility and triggered deceleration on old path!
+1682122179.6974998;WARNING;Velocity profile generation did not match the inserted boundary conditions! (Action Set: straight, Offset: -0.39m/s)
+1682122179.6983752;WARNING;Detected iterative infeasibility and triggered deceleration on old path!
+1682122179.7685633;WARNING;Velocity profile generation did not match the inserted boundary conditions! (Action Set: straight, Offset: -0.45m/s)
+1682122179.769558;WARNING;Detected iterative infeasibility and triggered deceleration on old path!
+1682122179.8156493;WARNING;Velocity profile generation did not match the inserted boundary conditions! (Action Set: straight, Offset: -0.58m/s)
+1682122179.8165238;WARNING;Detected iterative infeasibility and triggered deceleration on old path!
+1682122179.8840647;WARNING;Velocity profile generation did not match the inserted boundary conditions! (Action Set: straight, Offset: -0.58m/s)
+1682122179.884942;WARNING;Detected iterative infeasibility and triggered deceleration on old path!
+1682122179.931984;WARNING;Velocity profile generation did not match the inserted boundary conditions! (Action Set: straight, Offset: -0.58m/s)
+1682122179.933025;WARNING;Detected iterative infeasibility and triggered deceleration on old path!
+1682122180.0034606;WARNING;Velocity profile generation did not match the inserted boundary conditions! (Action Set: straight, Offset: -0.58m/s)
+1682122183.5486982;WARNING;Velocity profile generation did not match the inserted boundary conditions! (Action Set: straight, Offset: -0.39m/s)
+1682122183.5496025;WARNING;Detected iterative infeasibility and triggered deceleration on old path!
+1682122183.6167035;WARNING;Velocity profile generation did not match the inserted boundary conditions! (Action Set: straight, Offset: -0.49m/s)
+1682122183.617739;WARNING;Detected iterative infeasibility and triggered deceleration on old path!
+1682122183.665734;WARNING;Velocity profile generation did not match the inserted boundary conditions! (Action Set: straight, Offset: -0.57m/s)
+1682122183.6665752;WARNING;Detected iterative infeasibility and triggered deceleration on old path!
+1682122183.7347786;WARNING;Velocity profile generation did not match the inserted boundary conditions! (Action Set: straight, Offset: -0.65m/s)
+1682122183.7356448;WARNING;Detected iterative infeasibility and triggered deceleration on old path!
+1682122183.7823782;WARNING;Velocity profile generation did not match the inserted boundary conditions! (Action Set: straight, Offset: -0.79m/s)
+1682122183.7833023;WARNING;Detected iterative infeasibility and triggered deceleration on old path!
+1682122183.8540688;WARNING;Velocity profile generation did not match the inserted boundary conditions! (Action Set: straight, Offset: -0.79m/s)
+1682122183.8548834;WARNING;Detected iterative infeasibility and triggered deceleration on old path!
+1682122183.8995273;WARNING;Velocity profile generation did not match the inserted boundary conditions! (Action Set: straight, Offset: -0.79m/s)
+1682122183.9003546;WARNING;Detected iterative infeasibility and triggered deceleration on old path!
+1682122183.9671242;WARNING;Velocity profile generation did not match the inserted boundary conditions! (Action Set: straight, Offset: -0.79m/s)
+1682122185.8200793;WARNING;Velocity profile generation did not match the inserted boundary conditions! (Action Set: straight, Offset: -0.54m/s)
+1682122185.8211417;WARNING;Detected iterative infeasibility and triggered deceleration on old path!
+1682122185.8711743;WARNING;Velocity profile generation did not match the inserted boundary conditions! (Action Set: straight, Offset: -0.57m/s)
+1682122185.872081;WARNING;Detected iterative infeasibility and triggered deceleration on old path!
+1682122185.9387872;WARNING;Velocity profile generation did not match the inserted boundary conditions! (Action Set: straight, Offset: -0.66m/s)
+1682122185.939634;WARNING;Detected iterative infeasibility and triggered deceleration on old path!
+1682122185.9848437;WARNING;Velocity profile generation did not match the inserted boundary conditions! (Action Set: straight, Offset: -0.72m/s)
+1682122185.985637;WARNING;Detected iterative infeasibility and triggered deceleration on old path!
+1682122186.0550175;WARNING;Velocity profile generation did not match the inserted boundary conditions! (Action Set: straight, Offset: -0.72m/s)
+1682122186.0558078;WARNING;Detected iterative infeasibility and triggered deceleration on old path!
+1682122186.1026547;WARNING;Velocity profile generation did not match the inserted boundary conditions! (Action Set: straight, Offset: -0.72m/s)
+1682122186.1034935;WARNING;Detected iterative infeasibility and triggered deceleration on old path!
+1682122186.1746328;WARNING;Velocity profile generation did not match the inserted boundary conditions! (Action Set: straight, Offset: -0.72m/s)
+1682122186.1756308;WARNING;Detected iterative infeasibility and triggered deceleration on old path!
+1682122186.23578;WARNING;Velocity profile generation did not match the inserted boundary conditions! (Action Set: straight, Offset: -0.72m/s)
