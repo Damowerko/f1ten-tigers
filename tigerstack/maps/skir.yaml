@@ -1,4 +1,4 @@
-image: outside.pgm
+image: skir.pgm
 mode: trinary
 resolution: 0.05
 origin: [-14.8, -4.63, 0]
