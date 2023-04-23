@@ -81,16 +81,16 @@ class Planner(Node):
         position = odom_msg.pose.pose.position
         self.pos_est = np.array([position.x, position.y])
 
-    def choose_action(self, traj_set=None):
+    def choose_action(self):
         for sel_action in [
-            "left",
             "straight",
+            "left",
             "right",
             "follow",
         ]:
             if sel_action in self.traj_set.keys():
                 return sel_action
-        return None
+        raise RuntimeError("No action found.")
 
     def get_objects(self):
         obj1 = {
