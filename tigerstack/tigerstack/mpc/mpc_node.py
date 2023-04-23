@@ -100,7 +100,7 @@ class MPC(Node):
 
         # load waypoints assuming constant speed
         waypoints_filename = (
-            get_package_share_directory("tigerstack") + "/maps/outside_traj_race_cl.csv"
+            get_package_share_directory("tigerstack") + "/maps/skir.csv"
         )
         self.waypoints, self.optimal_trajectory = waypoints.load_waypoints(
             waypoints_filename
