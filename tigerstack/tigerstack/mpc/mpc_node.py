@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import math
+import time
 from dataclasses import dataclass, field
 
 import cvxpy
@@ -91,6 +92,7 @@ class MPC(Node):
         self.path_sub = self.create_subscription(
             Float32MultiArray, "/path", self.path_callback, 1
         )
+        self.last_path_time = time.time()
 
         self.config = mpc_config()
         self.odelta_v = None
@@ -108,21 +110,27 @@ class MPC(Node):
         waypoints_filename = (
             get_package_share_directory("tigerstack") + "/maps/skir.csv"
         )
-        self.waypoints = np.loadtxt(waypoints_filename, delimiter=";", dtype=float)
-        self.update_trajectory()
+        self.static_waypoints = np.loadtxt(
+            waypoints_filename, delimiter=";", dtype=float
+        )
+        self.update_trajectory(self.static_waypoints)
 
         # initialize MPC problem
         self.mpc_prob_init()
 
     def path_callback(self, msg: Float32MultiArray):
-        self.waypoints = np.array(msg.data).reshape(-1, 7).astype(self.waypoints.dtype)
-        self.update_trajectory()
+        waypoints = np.array(msg.data).reshape(-1, 7).astype(np.float64)
+        self.update_trajectory(waypoints)
+        self.last_path_time = time.time()
 
-    def update_trajectory(self):
-        self.trajectory = trajectory_from_waypoints(self.waypoints)
-        self.lap_length = self.waypoints[-1, 0]
+    def update_trajectory(self, waypoints):
+        self.trajectory = trajectory_from_waypoints(waypoints)
+        self.lap_length = waypoints[-1, 0]
 
     def odom_callback(self, odom_msg: Odometry):
+        if time.time() - self.last_path_time > 0.2:
+            self.update_trajectory(self.static_waypoints)
+
         position = odom_msg.pose.pose.position
         orientation = odom_msg.pose.pose.orientation
         velocity = odom_msg.twist.twist.linear
