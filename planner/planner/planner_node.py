@@ -74,22 +74,21 @@ class Planner(Node):
 
         # set start pos
         self.ltpl_obj.set_startpos(pos_est=self.pos_est, heading_est=heading_est)
-        self.traj_set = {"straight": None}
 
     def odom_callback(self, odom_msg):
         self.vel_est = odom_msg.twist.twist.linear.x
         position = odom_msg.pose.pose.position
         self.pos_est = np.array([position.x, position.y])
 
-    def choose_action(self):
-        for sel_action in [
+    def select_action(self, trajectory_set):
+        for selected_action in [
             "straight",
             "left",
             "right",
             "follow",
         ]:
-            if sel_action in self.traj_set.keys():
-                return sel_action
+            if selected_action in trajectory_set.keys():
+                return selected_action
         raise RuntimeError("No action found.")
 
     def get_objects(self):
@@ -113,14 +112,14 @@ class Planner(Node):
         # -- CALCULATE VELOCITY PROFILE AND RETRIEVE TRAJECTORIES ----------------------------------------------------------
         # pos_est:[x, y]
         # vel_est:float
-        self.traj_set = self.ltpl_obj.calc_vel_profile(
+        traj_set = self.ltpl_obj.calc_vel_profile(
             pos_est=self.pos_est, vel_est=self.vel_est
         )[0]
 
-        self.selected_action = self.choose_action()
+        self.selected_action = self.select_action(traj_set)
 
         # [s, x, y, heading, curvature, vx, ax]
-        trajectory = self.traj_set[self.selected_action][0]
+        trajectory = traj_set[self.selected_action][0]
 
         array_msg = Float32MultiArray()
         array_msg.data = list(trajectory.flatten())
