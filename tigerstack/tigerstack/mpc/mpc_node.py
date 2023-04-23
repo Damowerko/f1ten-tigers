@@ -13,8 +13,10 @@ from rclpy.node import Node
 from scipy.linalg import block_diag
 from scipy.sparse import block_diag, csc_matrix
 from scipy.spatial.transform import Rotation
-from tigerstack.mpc import visualize, waypoints
+from std_msgs.msg import Float32MultiArray
+from tigerstack.mpc import visualize
 from tigerstack.mpc.utils import nearest_point
+from tigerstack.mpc.waypoints import trajectory_from_waypoints
 from visualization_msgs.msg import MarkerArray
 
 
@@ -33,10 +35,10 @@ class mpc_config:
         default_factory=lambda: np.diag([0.05, 50.0])
     )  # input difference cost matrix, penalty for change of inputs - [accel, steering_speed]
     Qk: npt.NDArray = field(
-        default_factory=lambda: np.diag([5.0, 5.0, 10.0, 1.0])
+        default_factory=lambda: np.diag([5.0, 5.0, 10.0, 5.0])
     )  # state error cost matrix, for the the next (T) prediction time steps [x, y, v, yaw]
     Qfk: npt.NDArray = field(
-        default_factory=lambda: np.diag([15.0, 15.0, 10.0, 1.0])
+        default_factory=lambda: np.diag([15.0, 15.0, 10.0, 5.0])
     )  # final state error matrix, penalty  for the final state constraints: [x, y, v, yaw]
     # ---------------------------------------------------
 
@@ -86,6 +88,10 @@ class MPC(Node):
             Odometry, odom_topic, self.odom_callback, 1
         )
 
+        self.path_sub = self.create_subscription(
+            Float32MultiArray, "/path", self.path_callback, 1
+        )
+
         self.config = mpc_config()
         self.odelta_v = None
         self.odelta = None
@@ -102,13 +108,19 @@ class MPC(Node):
         waypoints_filename = (
             get_package_share_directory("tigerstack") + "/maps/skir.csv"
         )
-        self.waypoints, self.optimal_trajectory = waypoints.load_waypoints(
-            waypoints_filename
-        )
-        self.lap_length = self.waypoints[-1, 0]
+        self.waypoints = np.loadtxt(waypoints_filename, delimiter=";", dtype=float)
+        self.update_trajectory()
 
         # initialize MPC problem
         self.mpc_prob_init()
+
+    def path_callback(self, msg: Float32MultiArray):
+        self.waypoints = np.array(msg.data).reshape(-1, 7).astype(self.waypoints.dtype)
+        self.update_trajectory()
+
+    def update_trajectory(self):
+        self.trajectory = trajectory_from_waypoints(self.waypoints)
+        self.lap_length = self.waypoints[-1, 0]
 
     def odom_callback(self, odom_msg: Odometry):
         position = odom_msg.pose.pose.position
@@ -155,7 +167,7 @@ class MPC(Node):
         markers.markers = [
             # visualize the waypoints
             visualize.points_to_line_marker(
-                self.optimal_trajectory[:, :2],
+                self.trajectory[:, :2],
                 color=(0, 1, 0, 0.5),
                 frame_id="map",
                 id=0,
@@ -347,9 +359,9 @@ class MPC(Node):
 
     def calc_ref_trajectory(self, state):
         _, _, _, nearest_idx = nearest_point(
-            np.array([state.x, state.y]), self.waypoints[:, 1:3]
+            np.array([state.x, state.y]), self.trajectory[:, :2]
         )
-        lap_step = self.lap_length / len(self.optimal_trajectory)
+        lap_step = self.lap_length / len(self.trajectory)
         # position along lap
         s = np.zeros(self.config.TK + 1)
         speed = np.zeros(self.config.TK + 1)
@@ -357,7 +369,7 @@ class MPC(Node):
         speed[0] = state.v
         for i in range(self.config.TK):
             idx = int(s[i] / lap_step)
-            speed[i + 1] = self.optimal_trajectory[idx, 2]
+            speed[i + 1] = self.trajectory[idx, 2]
             dv_max = self.config.MAX_ACCEL * self.config.DTK
             speed[i + 1] = min(speed[i] + dv_max, speed[i + 1])
             speed[i + 1] = max(speed[i] - dv_max, speed[i + 1])
@@ -368,11 +380,11 @@ class MPC(Node):
         # convert s to index
         optimal_idx = (s / lap_step).astype(int)
         # position & speed from optimal trajectory
-        position = self.optimal_trajectory[optimal_idx, :2]
-        speed = self.optimal_trajectory[optimal_idx[0].astype(int), 2]
+        position = self.trajectory[optimal_idx, :2]
+        speed = self.trajectory[optimal_idx[0].astype(int), 2]
 
         # heading
-        heading = self.optimal_trajectory[optimal_idx, 3]
+        heading = self.trajectory[optimal_idx, 3]
         heading[0] = state.yaw
         heading = np.unwrap(heading)
 

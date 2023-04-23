@@ -5,19 +5,13 @@ import numpy.typing as npt
 from scipy.interpolate import splev, splprep
 
 
-def load_waypoints(path: str) -> Tuple[npt.NDArray[np.float_], npt.NDArray[np.float_]]:
-    """
-    Load waypoints from a file.
-
-    Args:
-        path: Path to the file.
-
-    Returns:
-        An array of shape (n, m) containing the waypoints.
-    """
-    waypoints = np.loadtxt(path, delimiter=";", dtype=float)
-    waypoints[:, 3] = waypoints[:, 3] + np.pi / 2
-    return waypoints, waypoints[:, [1, 2, 5, 3]]
+def trajectory_from_waypoints(waypoints):
+    trajectory = np.empty((waypoints.shape[0], 4), waypoints.dtype)
+    trajectory[:, 0] = waypoints[:, 1]
+    trajectory[:, 1] = waypoints[:, 2]
+    trajectory[:, 2] = waypoints[:, 5]
+    trajectory[:, 3] = waypoints[:, 3] + np.pi / 2
+    return trajectory
 
 
 def fit_spline(waypoints: npt.NDArray[np.floating]):
