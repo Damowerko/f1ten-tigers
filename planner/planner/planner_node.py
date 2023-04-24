@@ -72,7 +72,7 @@ class Planner(Node):
         # set start pos
         self.initialized = False
 
-        self.filter_width = 20
+        self.filter_width = 10
         self.max_range = 2.0
 
     def odom_callback(self, odom_msg: Odometry):
