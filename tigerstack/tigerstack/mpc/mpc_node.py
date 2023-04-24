@@ -79,18 +79,24 @@ class MPC(Node):
 
         # declare parameters
         self.sim = bool(self.declare_parameter("sim", True).value)
+        self.opp = bool(self.declare_parameter("opp", False).value)
 
         # publishers and subscribers
-        self.pub_drive = self.create_publisher(AckermannDriveStamped, "/drive", 1)
+        drive_topic = f"/drive" if not self.opp else "/opp_drive"
+        self.pub_drive = self.create_publisher(AckermannDriveStamped, drive_topic, 1)
         self.pub_visualize = self.create_publisher(MarkerArray, "~/visualize", 1)
 
-        odom_topic = "/ego_racecar/odom" if self.sim else "/pf/pose/odom"
+        odom_topic = (
+            ("/opp_racecar/odom" if self.opp else "/ego_racecar/odom")
+            if self.sim
+            else "/pf/pose/odom"
+        )
         self.sub_odom = self.create_subscription(
             Odometry, odom_topic, self.odom_callback, 1
         )
 
         self.path_sub = self.create_subscription(
-            Float32MultiArray, "/path", self.path_callback, 1
+            Float32MultiArray, f"/path", self.path_callback, 1
         )
         self.last_path_time = time.time()
 
@@ -108,27 +114,31 @@ class MPC(Node):
 
         # load waypoints assuming constant speed
         waypoints_filename = (
-            get_package_share_directory("tigerstack") + "/maps/skir.csv"
+            get_package_share_directory("tigerstack") + "/maps/skir2.csv"
         )
         self.static_waypoints = np.loadtxt(
             waypoints_filename, delimiter=";", dtype=float
         )
+        self.use_static_waypoints = True
         self.update_trajectory(self.static_waypoints)
 
         # initialize MPC problem
         self.mpc_prob_init()
 
     def path_callback(self, msg: Float32MultiArray):
+        self.last_path_time = time.time()
+        self.use_static_waypoints = False
         waypoints = np.array(msg.data).reshape(-1, 7).astype(np.float64)
         self.update_trajectory(waypoints)
-        self.last_path_time = time.time()
 
     def update_trajectory(self, waypoints):
         self.trajectory = trajectory_from_waypoints(waypoints)
         self.lap_length = waypoints[-1, 0]
 
     def odom_callback(self, odom_msg: Odometry):
-        if time.time() - self.last_path_time > 0.2:
+        if not self.use_static_waypoints and time.time() - self.last_path_time > 0.2:
+            self.get_logger().warn("Fallback to static waypoints!")
+            self.use_static_waypoints = True
             self.update_trajectory(self.static_waypoints)
 
         position = odom_msg.pose.pose.position
