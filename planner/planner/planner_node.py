@@ -11,6 +11,8 @@ from rclpy.node import Node
 from scipy.spatial.transform import Rotation as R
 from sensor_msgs.msg import LaserScan
 from std_msgs.msg import Float32MultiArray
+from tigerstack.mpc.visualize import points_to_arrow_markers
+from visualization_msgs.msg import Marker, MarkerArray
 
 # track_param = configparser.ConfigParser()
 # if not track_param.read(toppath + "/params/driving_task.ini"):
@@ -53,6 +55,7 @@ class Planner(Node):
         self.sub_scan = self.create_subscription(
             LaserScan, "/scan", self.scan_callback, 1
         )
+        self.pub_visualize = self.create_publisher(MarkerArray, "~/visualize", 1)
 
         # intialize graph_ltpl-class
         self.ltpl_obj = Graph_LTPL(
@@ -71,8 +74,8 @@ class Planner(Node):
         # set start pos
         self.initialized = False
 
-        self.max_range = 4.0
-        self.filter_width = 5
+        self.max_range = 2.0
+        self.filter_width = 3
 
     def odom_callback(self, odom_msg: Odometry):
         position = odom_msg.pose.pose.position
@@ -86,56 +89,63 @@ class Planner(Node):
             - np.pi / 2
         )
 
-    def process_lidar(self, ranges, angles):
-        ranges = np.nan_to_num(ranges)
-        ranges = np.convolve(
-            ranges, np.ones(self.filter_width) / self.filter_width, "same"
-        )
-        # set far scans to max value
-        ranges[ranges > self.max_range] = 100
-        diff = np.diff(ranges)
-        # might break for obstaces on either end of the scan
-        rising_edge = (diff < -2 * self.max_range).nonzero()[0]
-        falling_edge = (diff > 2 * self.max_range).nonzero()[0] + 1
-
-        n_edges = min(len(rising_edge), len(falling_edge))
-        rising_edge = rising_edge[:n_edges]
-        falling_edge = falling_edge[:n_edges]
-
-        center_indices = (falling_edge + rising_edge) // 2
-        positions = np.array(
-            [
-                ranges[center_indices] * np.cos(angles[center_indices]),
-                ranges[center_indices] * np.sin(angles[center_indices]),
-                0,
-            ]
-        )
-        t = np.array(
-            [
-                self.position[0],
-                self.position[1],
-                0,
-            ]
-        )
-        r = R.from_euler("z", self.heading, degrees=False).as_matrix()
-        map_obs_poses = r @ positions.reshape(-1, 3) + t
-        return map_obs_poses
-
     def scan_callback(self, data: LaserScan):
         if self.position is None:
             return
 
-        # Find angles between -self.angle_max and self.angle_max
+        # Find angles between self.angle_min and self.angle_max
         angles = np.arange(data.angle_min, data.angle_max, data.angle_increment)
         ranges = np.asarray(data.ranges)
 
-        # Get angles between -90 and 90 degrees
-        mask = np.abs(angles) < np.pi / 2
+        t = np.array([self.position[0], self.position[1]])
+        angle_offset = 0  # self.heading + np.pi / 2
+        laser_positions = np.array(
+            [
+                ranges * np.cos(angles + angle_offset),
+                ranges * np.sin(angles + angle_offset),
+            ]
+        ).reshape(-1, 2)
 
-        angles = angles[mask]
-        ranges = ranges[mask]
+        ranges = np.convolve(
+            ranges, np.ones(self.filter_width) / self.filter_width, "same"
+        )
+        occupied = ranges < self.max_range
+        # pad ranges to find edges at start and end
+        ranges = np.pad(occupied, 1, mode="constant", constant_values=False)
 
-        self.obstacles = self.process_lidar(ranges, angles)
+        diff = np.diff(1 * ranges)
+        rising_edge = (diff > 0).nonzero()[0]
+        falling_edge = (diff < 0).nonzero()[0]
+
+        self.obstacles = []
+        for i in range(len(rising_edge)):
+            start_idx = rising_edge[i]
+            end_idx = min(falling_edge[i], len(ranges) - 1)
+
+            center = np.mean(laser_positions[start_idx:end_idx], axis=0)
+
+            if np.linalg.norm(center - t) < 0.1:
+                continue
+
+            self.obstacles += [
+                {
+                    "id": 0,  # integer id of the object
+                    "type": "physical",  # type 'physical' (only class implemented so far)
+                    "X": center[0],  # x coordinate
+                    "Y": center[1],  # y coordinate
+                    "theta": 0.0,  # orientation (north = 0.0)
+                    "v": 0.0,  # velocity along theta
+                    "length": 0.3,  # length of the object
+                    "width": 0.3,  # width of the object
+                }
+            ]
+
+        # visualize obstacles
+        markers = MarkerArray()
+        points = np.array([(o["X"], o["Y"]) for o in self.obstacles])
+        headings = np.array([o["theta"] for o in self.obstacles])
+        markers.markers = [points_to_arrow_markers(points, headings)]
+        self.pub_visualize.publish(markers)
 
     def opponent_callback(self, odom_msg: Odometry):
         position = odom_msg.pose.pose.position
@@ -173,22 +183,7 @@ class Planner(Node):
         #     "length": 0.1,  # length of the object
         #     "width": 0.1,  # width of the object
         # }
-        objects = []
-        if self.obstacles is None:
-            return []
-        for obstacle in self.obstacles:
-            opponent = {
-                "id": 0,  # integer id of the object
-                "type": "physical",  # type 'physical' (only class implemented so far)
-                "X": obstacle[0],  # x coordinate
-                "Y": obstacle[1],  # y coordinate
-                "theta": 0,  # orientation (north = 0.0)
-                "v": 0,  # velocity along theta
-                "length": 0.1,  # length of the object
-                "width": 0.1,  # width of the object
-            }
-            objects += [opponent]
-        return objects
+        return self.obstacles
 
     def timer_callback(self):
         if not self.initialized and self.position is not None:
