@@ -27,6 +27,7 @@ def generate_launch_description():
                 remappings=[
                     ("/drive", "/opp_drive"),
                     ("/ego_racecar/odom", "/opp_racecar/odom"),
+                    ("/path", "/opp_path"),
                 ],
             ),
         ]

@@ -19,8 +19,8 @@ toppath = get_package_share_directory("planner")
 
 # define all relevant paths
 path_dict = {
-    "globtraj_input_path": toppath + "/config/traj_ltpl_cl_skir.csv",
-    "graph_store_path": toppath + "/output/stored_graph.pckl",
+    "globtraj_input_path": toppath + "/config/traj_ltpl_cl.csv",
+    "graph_store_path": toppath + "/stored_graph.pckl",
     "ltpl_offline_param_path": toppath + "/config/ltpl_config_offline.ini",
     "ltpl_online_param_path": toppath + "/config/ltpl_config_online.ini",
 }
@@ -50,7 +50,7 @@ class Planner(Node):
 
         # intialize graph_ltpl-class
         self.ltpl_obj = Graph_LTPL(
-            path_dict=path_dict, visual_mode=True, log_to_file=False
+            path_dict=path_dict, visual_mode=False, log_to_file=False
         )
 
         # calculate offline graph
@@ -58,6 +58,9 @@ class Planner(Node):
 
         # set start pose based on first point in provided reference-line
         self.selected_action = "straight"
+
+        self.position = None
+        self.opponent_position = None
 
         # set start pos
         self.initialized = False
@@ -68,7 +71,7 @@ class Planner(Node):
         self.position = np.array([position.x, position.y])
         self.velocity = odom_msg.twist.twist.linear.x
         self.heading = (
-            Rotation.from_quat(
+            R.from_quat(
                 [orientation.x, orientation.y, orientation.z, orientation.w]
             ).as_euler("xyz")[2]
             - np.pi / 2
@@ -80,7 +83,7 @@ class Planner(Node):
         self.opponent_position = np.array([position.x, position.y])
         self.opponent_velocity = odom_msg.twist.twist.linear.x
         self.opponent_heading = (
-            Rotation.from_quat(
+            R.from_quat(
                 [orientation.x, orientation.y, orientation.z, orientation.w]
             ).as_euler("xyz")[2]
             - np.pi / 2
@@ -98,7 +101,9 @@ class Planner(Node):
         raise RuntimeError("No action found.")
 
     def get_objects(self):
-        obj1 = {
+        if self.opponent_position is None:
+            return []
+        opponent = {
             "id": 0,  # integer id of the object
             "type": "physical",  # type 'physical' (only class implemented so far)
             "X": self.opponent_position[0],  # x coordinate
@@ -108,18 +113,15 @@ class Planner(Node):
             "length": 0.33,  # length of the object
             "width": 0.31,  # width of the object
         }
-        return [obj1]
+        return [opponent]
 
     def timer_callback(self):
-        if (
-            not self.initialized
-            and self.position is not None
-            and self.heading is not None
-            and self.velocity is not None
-        ):
+        if not self.initialized and self.position is not None:
             self.initialized = self.ltpl_obj.set_startpos(
                 pos_est=self.position, heading_est=self.heading, vel_est=self.velocity
             )
+        if not self.initialized:
+            return
 
         self.ltpl_obj.calc_paths(
             prev_action_id=self.selected_action, object_list=self.get_objects()
