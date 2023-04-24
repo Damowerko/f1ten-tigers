@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-import time
 import math
+import time
 
 import numpy as np
 import rclpy
 from ament_index_python.packages import get_package_share_directory
 from graph_ltpl.Graph_LTPL import Graph_LTPL
-from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from scipy.spatial.transform import Rotation as R
+from sensor_msgs.msg import LaserScan
 from std_msgs.msg import Float32MultiArray
 
 # track_param = configparser.ConfigParser()
@@ -87,42 +87,39 @@ class Planner(Node):
         )
 
     def process_lidar(self, ranges, angles):
-        
         ranges = np.nan_to_num(ranges)
-
         ranges = np.convolve(
             ranges, np.ones(self.filter_width) / self.filter_width, "same"
         )
-
-
-        #set far scans to max value
-        ranges[ranges> self.max_range] = 100
-
+        # set far scans to max value
+        ranges[ranges > self.max_range] = 100
         diff = np.diff(ranges)
-
         # might break for obstaces on either end of the scan
-        rising_edge = (diff < - 2*self.max_range).nonzero()[0]
-        falling_edge = (diff > 2*self.max_range).nonzero()[0] + 1
-
-        center_indecies = (falling_edge + rising_edge) / 2
-
-        positions = [ranges[center_indecies] * np.cos(angles[center_indecies]), ranges[center_indecies] * np.sin(angles[center_indecies]), 0]
-
+        rising_edge = (diff < -2 * self.max_range).nonzero()[0]
+        falling_edge = (diff > 2 * self.max_range).nonzero()[0] + 1
+        center_indices = (falling_edge + rising_edge) // 2
+        positions = np.array(
+            [
+                ranges[center_indices] * np.cos(angles[center_indices]),
+                ranges[center_indices] * np.sin(angles[center_indices]),
+                0,
+            ]
+        )
         t = np.array(
-                [
-                    self.position[0],
-                    self.position[1],
-                    0,
-                ]
-            )
-        
-        r = R.from_euler('z', self.heading, degrees=False)
-
+            [
+                self.position[0],
+                self.position[1],
+                0,
+            ]
+        )
+        r = R.from_euler("z", self.heading, degrees=False).as_matrix()
         map_obs_poses = r @ positions + t
-
         return map_obs_poses
 
-    def laserscan_callback(self, data: LaserScan):
+    def scan_callback(self, data: LaserScan):
+        if self.position is None:
+            return
+
         # Find angles between -self.angle_max and self.angle_max
         angles = np.arange(data.angle_min, data.angle_max, data.angle_increment)
         ranges = np.asarray(data.ranges)
@@ -133,7 +130,7 @@ class Planner(Node):
         angles = angles[mask]
         ranges = ranges[mask]
 
-        obstacles = self.process_lidar(ranges, angles)
+        self.obstacles = self.process_lidar(ranges, angles)
 
     def opponent_callback(self, odom_msg: Odometry):
         position = odom_msg.pose.pose.position
@@ -149,9 +146,9 @@ class Planner(Node):
 
     def select_action(self, trajectory_set):
         for selected_action in [
-            "straight",
             "right",
             "left",
+            "straight",
             "follow",
         ]:
             if selected_action in trajectory_set.keys():
@@ -161,17 +158,30 @@ class Planner(Node):
     def get_objects(self):
         if self.opponent_position is None:
             return []
-        opponent = {
-            "id": 0,  # integer id of the object
-            "type": "physical",  # type 'physical' (only class implemented so far)
-            "X": self.opponent_position[0],  # x coordinate
-            "Y": self.opponent_position[1],  # y coordinate
-            "theta": self.opponent_heading,  # orientation (north = 0.0)
-            "v": self.opponent_velocity,  # velocity along theta
-            "length": 0.1,  # length of the object
-            "width": 0.1,  # width of the object
-        }
-        return [opponent]
+        # opponent = {
+        #     "id": 0,  # integer id of the object
+        #     "type": "physical",  # type 'physical' (only class implemented so far)
+        #     "X": self.opponent_position[0],  # x coordinate
+        #     "Y": self.opponent_position[1],  # y coordinate
+        #     "theta": self.opponent_heading,  # orientation (north = 0.0)
+        #     "v": self.opponent_velocity,  # velocity along theta
+        #     "length": 0.1,  # length of the object
+        #     "width": 0.1,  # width of the object
+        # }
+        objects = []
+        for obstacle in self.obstacles:
+            opponent = {
+                "id": 0,  # integer id of the object
+                "type": "physical",  # type 'physical' (only class implemented so far)
+                "X": obstacle[0],  # x coordinate
+                "Y": obstacle[1],  # y coordinate
+                "theta": 0,  # orientation (north = 0.0)
+                "v": 0,  # velocity along theta
+                "length": 0.1,  # length of the object
+                "width": 0.1,  # width of the object
+            }
+            objects += [opponent]
+        return objects
 
     def timer_callback(self):
         if not self.initialized and self.position is not None:
