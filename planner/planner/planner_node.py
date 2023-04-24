@@ -92,8 +92,8 @@ class Planner(Node):
     def select_action(self, trajectory_set):
         for selected_action in [
             "straight",
-            "left",
             "right",
+            "left",
             "follow",
         ]:
             if selected_action in trajectory_set.keys():
@@ -110,8 +110,8 @@ class Planner(Node):
             "Y": self.opponent_position[1],  # y coordinate
             "theta": self.opponent_heading,  # orientation (north = 0.0)
             "v": self.opponent_velocity,  # velocity along theta
-            "length": 0.33,  # length of the object
-            "width": 0.31,  # width of the object
+            "length": 0.1,  # length of the object
+            "width": 0.1,  # width of the object
         }
         return [opponent]
 
@@ -120,18 +120,26 @@ class Planner(Node):
             self.initialized = self.ltpl_obj.set_startpos(
                 pos_est=self.position, heading_est=self.heading, vel_est=self.velocity
             )
-        if not self.initialized:
+        if not self.initialized or self.position is None:
             return
 
         self.ltpl_obj.calc_paths(
-            prev_action_id=self.selected_action, object_list=self.get_objects()
+            prev_action_id=self.selected_action,
+            object_list=self.get_objects(),
         )
 
         # -- CALCULATE VELOCITY PROFILE AND RETRIEVE TRAJECTORIES ----------------------------------------------------------
         # pos_est:[x, y]
         # vel_est:float
         traj_set = self.ltpl_obj.calc_vel_profile(
-            pos_est=self.position, vel_est=self.velocity
+            pos_est=self.position,
+            vel_est=self.velocity,
+            vel_max=20.0,
+            gg_scale=1.0,
+            local_gg=(10.0, 6.0),
+            ax_max_machines=np.array([[0.0, 10.0], [20.0, 10.0]]),
+            safety_d=0.5,
+            incl_emerg_traj=False,
         )[0]
 
         self.selected_action = self.select_action(traj_set)
