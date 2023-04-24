@@ -72,8 +72,9 @@ class Planner(Node):
         # set start pos
         self.initialized = False
 
-        self.filter_width = 10
+        self.filter_width = 20
         self.max_range = 2.0
+        self.obstacles = []
 
     def odom_callback(self, odom_msg: Odometry):
         position = odom_msg.pose.pose.position
@@ -95,6 +96,11 @@ class Planner(Node):
         angles = np.arange(data.angle_min, data.angle_max, data.angle_increment)
         ranges = np.asarray(data.ranges)
         ranges = np.nan_to_num(ranges)
+
+        mask = (np.abs(angles) < np.pi/2) & (ranges < self.max_range)
+        angles = angles[mask]
+        ranges = ranges[mask]
+
         ranges = np.clip(ranges, 0, data.range_max)
 
         ranges = np.convolve(
@@ -123,8 +129,8 @@ class Planner(Node):
                     "Y": laser_positions[i, 1],  # y coordinate
                     "theta": 0.0,  # orientation (north = 0.0)
                     "v": 0.0,  # velocity along theta
-                    "length": 0.1,  # length of the object
-                    "width": 0.1,  # width of the object
+                    "length": 0.3,  # length of the object
+                    "width": 0.3,  # width of the object
                 }
             ]
 
@@ -168,6 +174,7 @@ class Planner(Node):
         raise RuntimeError("No action found.")
 
     def get_objects(self):
+        return []
         return self.obstacles
 
     def timer_callback(self):

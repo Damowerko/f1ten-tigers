@@ -30,16 +30,16 @@ class mpc_config:
     # ---------------------------------------------------
     # TODO: you may need to tune the following matrices
     Rk: npt.NDArray = field(
-        default_factory=lambda: np.diag([0.01, 1.0])
+        default_factory=lambda: np.diag([0.01, 5.0])
     )  # input cost matrix, penalty for inputs - [accel, steering_speed]
     Rdk: npt.NDArray = field(
-        default_factory=lambda: np.diag([0.05, 10.0])
+        default_factory=lambda: np.diag([0.05, 50.0])
     )  # input difference cost matrix, penalty for change of inputs - [accel, steering_speed]
     Qk: npt.NDArray = field(
         default_factory=lambda: np.diag([5.0, 5.0, 10.0, 3.0])
     )  # state error cost matrix, for the the next (T) prediction time steps [x, y, v, yaw]
     Qfk: npt.NDArray = field(
-        default_factory=lambda: np.diag([20.0, 20.0, 10.0, 3.0])
+        default_factory=lambda: np.diag([10.0, 20.0, 10.0, 3.0])
     )  # final state error matrix, penalty  for the final state constraints: [x, y, v, yaw]
     # ---------------------------------------------------
 
@@ -131,7 +131,7 @@ class MPC(Node):
         self.lap_length = waypoints[-1, 0]
 
     def odom_callback(self, odom_msg: Odometry):
-        if not self.use_static_waypoints and time.time() - self.last_path_time > 0.2:
+        if not self.use_static_waypoints and time.time() - self.last_path_time > 1.0:
             self.get_logger().warn("Fallback to static waypoints!")
             self.use_static_waypoints = True
             self.update_trajectory(self.static_waypoints)
