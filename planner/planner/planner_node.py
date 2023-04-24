@@ -7,6 +7,7 @@ from ament_index_python.packages import get_package_share_directory
 from graph_ltpl.Graph_LTPL import Graph_LTPL
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
+from scipy.spatial.transform import Rotation as R
 from std_msgs.msg import Float32MultiArray
 
 # track_param = configparser.ConfigParser()
@@ -15,23 +16,14 @@ from std_msgs.msg import Float32MultiArray
 
 
 toppath = get_package_share_directory("planner")
-track_specifier = "skir"
 
 # define all relevant paths
 path_dict = {
-    "globtraj_input_path": toppath
-    + "/inputs/traj_ltpl_cl/traj_ltpl_cl_"
-    + track_specifier
-    + ".csv",
+    "globtraj_input_path": toppath + "/config/traj_ltpl_cl_skir.csv",
     "graph_store_path": toppath + "/output/stored_graph.pckl",
-    "ltpl_offline_param_path": toppath + "/params/ltpl_config_offline.ini",
-    "ltpl_online_param_path": toppath + "/params/ltpl_config_online.ini",
+    "ltpl_offline_param_path": toppath + "/config/params/ltpl_config_offline.ini",
+    "ltpl_online_param_path": toppath + "/config/params/ltpl_config_online.ini",
 }
-
-
-# CAROFFSET = 0.3
-# L =2
-# KP = 0.3
 
 
 class Planner(Node):
@@ -48,15 +40,12 @@ class Planner(Node):
         self.timer = self.create_timer(0.05, self.timer_callback)
         self.publisher_array = self.create_publisher(Float32MultiArray, "/path", 1)
 
-        prefix = "/ego_racecar" if self.opponent else "/opp_racecar"
+        odom_topic = "/ego_racecar/odom" if self.sim else "/pf/pose/odom"
         self.sub_odom = self.create_subscription(
-            Odometry,
-            f"{prefix}/odom" if self.sim else "/pf/pose/odom",
-            self.odom_callback,
-            1,
+            Odometry, odom_topic, self.odom_callback, 1
         )
         self.opponent_topic = self.create_subscription(
-            Odometry, f"/ego_racecar/opp_odom", self.opponent_callback, 1
+            Odometry, "/ego_racecar/opp_odom", self.opponent_callback, 1
         )
 
         # intialize graph_ltpl-class
@@ -114,8 +103,8 @@ class Planner(Node):
             "type": "physical",  # type 'physical' (only class implemented so far)
             "X": self.opponent_position[0],  # x coordinate
             "Y": self.opponent_position[1],  # y coordinate
-            "theta": 0,  # orientation (north = 0.0)
-            "v": 0.0,  # velocity along theta
+            "theta": self.opponent_heading,  # orientation (north = 0.0)
+            "v": self.opponent_velocity,  # velocity along theta
             "length": 0.33,  # length of the object
             "width": 0.31,  # width of the object
         }
