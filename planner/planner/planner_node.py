@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 import time
+import math
 
 import numpy as np
 import rclpy
 from ament_index_python.packages import get_package_share_directory
 from graph_ltpl.Graph_LTPL import Graph_LTPL
+from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from scipy.spatial.transform import Rotation as R
@@ -48,6 +50,10 @@ class Planner(Node):
             Odometry, "/ego_racecar/opp_odom", self.opponent_callback, 1
         )
 
+        self.sub_scan = self.create_subscription(
+            LaserScan, "/scan", self.scan_callback, 1
+        )
+
         # intialize graph_ltpl-class
         self.ltpl_obj = Graph_LTPL(
             path_dict=path_dict, visual_mode=False, log_to_file=False
@@ -65,6 +71,9 @@ class Planner(Node):
         # set start pos
         self.initialized = False
 
+        self.max_range = 4.0
+        self.filter_width = 5
+
     def odom_callback(self, odom_msg: Odometry):
         position = odom_msg.pose.pose.position
         orientation = odom_msg.pose.pose.orientation
@@ -76,6 +85,55 @@ class Planner(Node):
             ).as_euler("xyz")[2]
             - np.pi / 2
         )
+
+    def process_lidar(self, ranges, angles):
+        
+        ranges = np.nan_to_num(ranges)
+
+        ranges = np.convolve(
+            ranges, np.ones(self.filter_width) / self.filter_width, "same"
+        )
+
+
+        #set far scans to max value
+        ranges[ranges> self.max_range] = 100
+
+        diff = np.diff(ranges)
+
+        # might break for obstaces on either end of the scan
+        rising_edge = (diff < - 2*self.max_range).nonzero()[0]
+        falling_edge = (diff > 2*self.max_range).nonzero()[0] + 1
+
+        center_indecies = (falling_edge + rising_edge) / 2
+
+        positions = [ranges[center_indecies] * np.cos(angles[center_indecies]), ranges[center_indecies] * np.sin(angles[center_indecies]), 0]
+
+        t = np.array(
+                [
+                    self.position[0],
+                    self.position[1],
+                    0,
+                ]
+            )
+        
+        r = R.from_euler('z', self.heading, degrees=False)
+
+        map_obs_poses = r @ positions + t
+
+        return map_obs_poses
+
+    def laserscan_callback(self, data: LaserScan):
+        # Find angles between -self.angle_max and self.angle_max
+        angles = np.arange(data.angle_min, data.angle_max, data.angle_increment)
+        ranges = np.asarray(data.ranges)
+
+        # Get angles between -90 and 90 degrees
+        mask = np.abs(angles) < np.pi / 2
+
+        angles = angles[mask]
+        ranges = ranges[mask]
+
+        obstacles = self.process_lidar(ranges, angles)
 
     def opponent_callback(self, odom_msg: Odometry):
         position = odom_msg.pose.pose.position
