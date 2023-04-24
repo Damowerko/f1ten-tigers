@@ -109,7 +109,7 @@ class MPC(Node):
 
         # load waypoints assuming constant speed
         waypoints_filename = (
-            get_package_share_directory("tigerstack") + "/maps/skir_4ay.csv"
+            get_package_share_directory("tigerstack") + "/maps/skir_6ay.csv"
         )
         self.static_waypoints = np.loadtxt(
             waypoints_filename, delimiter=";", dtype=float
