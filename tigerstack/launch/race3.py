@@ -7,28 +7,29 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
+    sim_arg = DeclareLaunchArgument(
+        "sim",
+        default_value="False",
+        description="Whether to run in simulation or not.",
+    )
+
     return LaunchDescription(
         [
+            sim_arg,
             Node(
                 package="tigerstack",
                 executable="mpc_node",
                 name="mpc_node",
                 parameters=[
-                    {"sim": True},
+                    {"sim": LaunchConfiguration("sim")},
                 ],
             ),
             Node(
-                package="tigerstack",
-                executable="mpc_node",
-                name="mpc_node_opp",
+                package="planner",
+                executable="planner_node",
+                name="planner_node",
                 parameters=[
-                    {"sim": True},
-                    {"speed_factor": 0.8},
-                ],
-                remappings=[
-                    ("/drive", "/opp_drive"),
-                    ("/ego_racecar/odom", "/opp_racecar/odom"),
-                    ("/path", "/opp_path"),
+                    {"sim": LaunchConfiguration("sim")},
                 ],
             ),
         ]

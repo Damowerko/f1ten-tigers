@@ -48,9 +48,6 @@ class Planner(Node):
         self.sub_odom = self.create_subscription(
             Odometry, odom_topic, self.odom_callback, 1
         )
-        self.opponent_topic = self.create_subscription(
-            Odometry, "/ego_racecar/opp_odom", self.opponent_callback, 1
-        )
 
         self.sub_scan = self.create_subscription(
             LaserScan, "/scan", self.scan_callback, 1
@@ -63,19 +60,20 @@ class Planner(Node):
         )
 
         # calculate offline graph
+        self.get_logger().info("Calculating offline graph...")
         self.ltpl_obj.graph_init()
+        self.get_logger().info("Graph calculated!")
 
         # set start pose based on first point in provided reference-line
         self.selected_action = "straight"
 
         self.position = None
-        self.opponent_position = None
 
         # set start pos
         self.initialized = False
 
+        self.filter_width = 20
         self.max_range = 2.0
-        self.filter_width = 3
 
     def odom_callback(self, odom_msg: Odometry):
         position = odom_msg.pose.pose.position
@@ -96,74 +94,73 @@ class Planner(Node):
         # Find angles between self.angle_min and self.angle_max
         angles = np.arange(data.angle_min, data.angle_max, data.angle_increment)
         ranges = np.asarray(data.ranges)
-
-        t = np.array([self.position[0], self.position[1]])
-        angle_offset = 0  # self.heading + np.pi / 2
-        laser_positions = np.array(
-            [
-                ranges * np.cos(angles + angle_offset),
-                ranges * np.sin(angles + angle_offset),
-            ]
-        ).reshape(-1, 2)
+        ranges = np.nan_to_num(ranges)
+        ranges = np.clip(ranges, 0, data.range_max)
 
         ranges = np.convolve(
             ranges, np.ones(self.filter_width) / self.filter_width, "same"
         )
-        occupied = ranges < self.max_range
-        # pad ranges to find edges at start and end
-        ranges = np.pad(occupied, 1, mode="constant", constant_values=False)
 
-        diff = np.diff(1 * ranges)
-        rising_edge = (diff > 0).nonzero()[0]
-        falling_edge = (diff < 0).nonzero()[0]
+        t = np.array([self.position[0], self.position[1]])
+        angle_offset = self.heading + np.pi / 2
+        laser_positions = (
+            t
+            + np.array(
+                [
+                    ranges * np.cos(angles + angle_offset),
+                    ranges * np.sin(angles + angle_offset),
+                ]
+            ).T
+        )
 
         self.obstacles = []
-        for i in range(len(rising_edge)):
-            start_idx = rising_edge[i]
-            end_idx = min(falling_edge[i], len(ranges) - 1)
-
-            center = np.mean(laser_positions[start_idx:end_idx], axis=0)
-
-            if np.linalg.norm(center - t) < 0.1:
-                continue
-
+        for i in range(0, len(laser_positions), self.filter_width):
             self.obstacles += [
                 {
                     "id": 0,  # integer id of the object
                     "type": "physical",  # type 'physical' (only class implemented so far)
-                    "X": center[0],  # x coordinate
-                    "Y": center[1],  # y coordinate
+                    "X": laser_positions[i, 0],  # x coordinate
+                    "Y": laser_positions[i, 1],  # y coordinate
                     "theta": 0.0,  # orientation (north = 0.0)
                     "v": 0.0,  # velocity along theta
-                    "length": 0.3,  # length of the object
-                    "width": 0.3,  # width of the object
+                    "length": 0.1,  # length of the object
+                    "width": 0.1,  # width of the object
                 }
             ]
 
-        # visualize obstacles
-        markers = MarkerArray()
-        points = np.array([(o["X"], o["Y"]) for o in self.obstacles])
-        headings = np.array([o["theta"] for o in self.obstacles])
-        markers.markers = [points_to_arrow_markers(points, headings)]
-        self.pub_visualize.publish(markers)
+        # occupied = ranges < self.max_range
+        # # pad ranges to find edges at start and end
+        # ranges = np.pad(occupied, 1, mode="constant", constant_values=False)
 
-    def opponent_callback(self, odom_msg: Odometry):
-        position = odom_msg.pose.pose.position
-        orientation = odom_msg.pose.pose.orientation
-        self.opponent_position = np.array([position.x, position.y])
-        self.opponent_velocity = odom_msg.twist.twist.linear.x
-        self.opponent_heading = (
-            R.from_quat(
-                [orientation.x, orientation.y, orientation.z, orientation.w]
-            ).as_euler("xyz")[2]
-            - np.pi / 2
-        )
+        # diff = np.diff(1 * ranges)
+        # rising_edge = (diff > 0).nonzero()[0]
+        # falling_edge = (diff < 0).nonzero()[0]
+
+        # self.obstacles = []
+        # for i in range(len(rising_edge)):
+        #     start_idx = rising_edge[i]
+        #     end_idx = min(falling_edge[i], len(ranges) - 1)
+
+        #     center = np.mean(laser_positions[start_idx:end_idx], axis=0)
+
+        #     self.obstacles += [
+        #         {
+        #             "id": 0,  # integer id of the object
+        #             "type": "physical",  # type 'physical' (only class implemented so far)
+        #             "X": center[0],  # x coordinate
+        #             "Y": center[1],  # y coordinate
+        #             "theta": 0.0,  # orientation (north = 0.0)
+        #             "v": 0.0,  # velocity along theta
+        #             "length": 0.3,  # length of the object
+        #             "width": 0.3,  # width of the object
+        #         }
+        #     ]
 
     def select_action(self, trajectory_set):
         for selected_action in [
             "right",
-            "left",
             "straight",
+            "left",
             "follow",
         ]:
             if selected_action in trajectory_set.keys():
@@ -171,18 +168,6 @@ class Planner(Node):
         raise RuntimeError("No action found.")
 
     def get_objects(self):
-        if self.opponent_position is None:
-            return []
-        # opponent = {
-        #     "id": 0,  # integer id of the object
-        #     "type": "physical",  # type 'physical' (only class implemented so far)
-        #     "X": self.opponent_position[0],  # x coordinate
-        #     "Y": self.opponent_position[1],  # y coordinate
-        #     "theta": self.opponent_heading,  # orientation (north = 0.0)
-        #     "v": self.opponent_velocity,  # velocity along theta
-        #     "length": 0.1,  # length of the object
-        #     "width": 0.1,  # width of the object
-        # }
         return self.obstacles
 
     def timer_callback(self):
