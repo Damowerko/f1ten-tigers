@@ -21,8 +21,8 @@ toppath = get_package_share_directory("planner")
 path_dict = {
     "globtraj_input_path": toppath + "/config/traj_ltpl_cl_skir.csv",
     "graph_store_path": toppath + "/output/stored_graph.pckl",
-    "ltpl_offline_param_path": toppath + "/config/params/ltpl_config_offline.ini",
-    "ltpl_online_param_path": toppath + "/config/params/ltpl_config_online.ini",
+    "ltpl_offline_param_path": toppath + "/config/ltpl_config_offline.ini",
+    "ltpl_online_param_path": toppath + "/config/ltpl_config_online.ini",
 }
 
 
