@@ -3,8 +3,8 @@ import time
 
 import numpy as np
 import rclpy
+from ament_index_python.packages import get_package_share_directory
 from graph_ltpl.Graph_LTPL import Graph_LTPL
-from graph_ltpl.imp_global_traj.src.import_globtraj_csv import import_globtraj_csv
 from nav_msgs.msg import Odometry
 from rclpy.node import Node
 from std_msgs.msg import Float32MultiArray
@@ -14,7 +14,7 @@ from std_msgs.msg import Float32MultiArray
 #     raise ValueError('Specified online parameter config file does not exist or is empty!')
 
 
-toppath = "/home/damow/ese615/f1ten_ws/src/f1ten-tigers/planner"
+toppath = get_package_share_directory("planner")
 track_specifier = "skir"
 
 # define all relevant paths
@@ -43,17 +43,21 @@ class Planner(Node):
     def __init__(self):
         super().__init__("planner_node")  # type: ignore
 
-        self.sim = True
+        self.sim = bool(self.declare_parameter("sim", True).value)
+
         self.timer = self.create_timer(0.05, self.timer_callback)
         self.publisher_array = self.create_publisher(Float32MultiArray, "/path", 1)
-        odom_topic = "/ego_racecar/odom" if self.sim else "/pf/pose/odom"
+
+        prefix = "/ego_racecar" if self.opponent else "/opp_racecar"
         self.sub_odom = self.create_subscription(
-            Odometry, odom_topic, self.odom_callback, 1
+            Odometry,
+            f"{prefix}/odom" if self.sim else "/pf/pose/odom",
+            self.odom_callback,
+            1,
         )
-        self.sub_odom
-        # ----------------------------------------------------------------------------------------------------------------------
-        # INITIALIZATION AND OFFLINE PART --------------------------------------------------------------------------------------
-        # ----------------------------------------------------------------------------------------------------------------------
+        self.opponent_topic = self.create_subscription(
+            Odometry, f"/ego_racecar/opp_odom", self.opponent_callback, 1
+        )
 
         # intialize graph_ltpl-class
         self.ltpl_obj = Graph_LTPL(
@@ -64,21 +68,34 @@ class Planner(Node):
         self.ltpl_obj.graph_init()
 
         # set start pose based on first point in provided reference-line
-        refline = import_globtraj_csv(import_path=path_dict["globtraj_input_path"])[0]
-        self.pos_est = refline[0, :]
-        heading_est = float(
-            np.arctan2(np.diff(refline[0:2, 1]), np.diff(refline[0:2, 0])) - np.pi / 2
-        )
-        self.vel_est = 0.0
         self.selected_action = "straight"
 
         # set start pos
-        self.ltpl_obj.set_startpos(pos_est=self.pos_est, heading_est=heading_est)
+        self.initialized = False
 
-    def odom_callback(self, odom_msg):
-        self.vel_est = odom_msg.twist.twist.linear.x
+    def odom_callback(self, odom_msg: Odometry):
         position = odom_msg.pose.pose.position
-        self.pos_est = np.array([position.x, position.y])
+        orientation = odom_msg.pose.pose.orientation
+        self.position = np.array([position.x, position.y])
+        self.velocity = odom_msg.twist.twist.linear.x
+        self.heading = (
+            Rotation.from_quat(
+                [orientation.x, orientation.y, orientation.z, orientation.w]
+            ).as_euler("xyz")[2]
+            - np.pi / 2
+        )
+
+    def opponent_callback(self, odom_msg: Odometry):
+        position = odom_msg.pose.pose.position
+        orientation = odom_msg.pose.pose.orientation
+        self.opponent_position = np.array([position.x, position.y])
+        self.opponent_velocity = odom_msg.twist.twist.linear.x
+        self.opponent_heading = (
+            Rotation.from_quat(
+                [orientation.x, orientation.y, orientation.z, orientation.w]
+            ).as_euler("xyz")[2]
+            - np.pi / 2
+        )
 
     def select_action(self, trajectory_set):
         for selected_action in [
@@ -95,16 +112,26 @@ class Planner(Node):
         obj1 = {
             "id": 0,  # integer id of the object
             "type": "physical",  # type 'physical' (only class implemented so far)
-            "X": 2.5,  # x coordinate
-            "Y": 1.0,  # y coordinate
+            "X": self.opponent_position[0],  # x coordinate
+            "Y": self.opponent_position[1],  # y coordinate
             "theta": 0,  # orientation (north = 0.0)
             "v": 0.0,  # velocity along theta
-            "length": 0.5,  # length of the object
-            "width": 0.5,  # width of the object
+            "length": 0.33,  # length of the object
+            "width": 0.31,  # width of the object
         }
         return [obj1]
 
     def timer_callback(self):
+        if (
+            not self.initialized
+            and self.position is not None
+            and self.heading is not None
+            and self.velocity is not None
+        ):
+            self.initialized = self.ltpl_obj.set_startpos(
+                pos_est=self.position, heading_est=self.heading, vel_est=self.velocity
+            )
+
         self.ltpl_obj.calc_paths(
             prev_action_id=self.selected_action, object_list=self.get_objects()
         )
@@ -113,7 +140,7 @@ class Planner(Node):
         # pos_est:[x, y]
         # vel_est:float
         traj_set = self.ltpl_obj.calc_vel_profile(
-            pos_est=self.pos_est, vel_est=self.vel_est
+            pos_est=self.position, vel_est=self.velocity
         )[0]
 
         self.selected_action = self.select_action(traj_set)

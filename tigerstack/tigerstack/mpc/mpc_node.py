@@ -79,18 +79,12 @@ class MPC(Node):
 
         # declare parameters
         self.sim = bool(self.declare_parameter("sim", True).value)
-        self.opp = bool(self.declare_parameter("opp", False).value)
 
-        # publishers and subscribers
-        drive_topic = f"/drive" if not self.opp else "/opp_drive"
-        self.pub_drive = self.create_publisher(AckermannDriveStamped, drive_topic, 1)
+        # p ublishers and subscribers
+        self.pub_drive = self.create_publisher(AckermannDriveStamped, "/drive", 1)
         self.pub_visualize = self.create_publisher(MarkerArray, "~/visualize", 1)
 
-        odom_topic = (
-            ("/opp_racecar/odom" if self.opp else "/ego_racecar/odom")
-            if self.sim
-            else "/pf/pose/odom"
-        )
+        odom_topic = "/ego_racecar/odom" if self.sim else "/pf/pose/odom"
         self.sub_odom = self.create_subscription(
             Odometry, odom_topic, self.odom_callback, 1
         )
@@ -114,7 +108,7 @@ class MPC(Node):
 
         # load waypoints assuming constant speed
         waypoints_filename = (
-            get_package_share_directory("tigerstack") + "/maps/skir2.csv"
+            get_package_share_directory("tigerstack") + "/maps/skir.csv"
         )
         self.static_waypoints = np.loadtxt(
             waypoints_filename, delimiter=";", dtype=float
