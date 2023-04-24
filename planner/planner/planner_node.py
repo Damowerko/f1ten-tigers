@@ -97,6 +97,11 @@ class Planner(Node):
         # might break for obstaces on either end of the scan
         rising_edge = (diff < -2 * self.max_range).nonzero()[0]
         falling_edge = (diff > 2 * self.max_range).nonzero()[0] + 1
+
+        n_edges = min(len(rising_edge), len(falling_edge))
+        rising_edge = rising_edge[:n_edges]
+        falling_edge = falling_edge[:n_edges]
+
         center_indices = (falling_edge + rising_edge) // 2
         positions = np.array(
             [
@@ -113,7 +118,7 @@ class Planner(Node):
             ]
         )
         r = R.from_euler("z", self.heading, degrees=False).as_matrix()
-        map_obs_poses = r @ positions + t
+        map_obs_poses = r @ positions.reshape(-1, 3) + t
         return map_obs_poses
 
     def scan_callback(self, data: LaserScan):
@@ -169,6 +174,8 @@ class Planner(Node):
         #     "width": 0.1,  # width of the object
         # }
         objects = []
+        if self.obstacles is None:
+            return []
         for obstacle in self.obstacles:
             opponent = {
                 "id": 0,  # integer id of the object
