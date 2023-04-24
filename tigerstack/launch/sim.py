@@ -23,6 +23,7 @@ def generate_launch_description():
                 name="mpc_node_opp",
                 parameters=[
                     {"sim": True},
+                    {"speed_factor": 0.95},
                 ],
                 remappings=[
                     ("/drive", "/opp_drive"),

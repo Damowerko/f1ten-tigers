@@ -25,21 +25,21 @@ from visualization_msgs.msg import MarkerArray
 class mpc_config:
     NXK: int = 4  # length of kinematic state vector: z = [x, y, v, yaw]
     NU: int = 2  # length of input vector: u = = [steering speed, acceleration]
-    TK: int = 8  # finite time horizon length kinematic
+    TK: int = 10  # finite time horizon length kinematic
 
     # ---------------------------------------------------
     # TODO: you may need to tune the following matrices
     Rk: npt.NDArray = field(
-        default_factory=lambda: np.diag([0.01, 5.0])
+        default_factory=lambda: np.diag([0.01, 1.0])
     )  # input cost matrix, penalty for inputs - [accel, steering_speed]
     Rdk: npt.NDArray = field(
-        default_factory=lambda: np.diag([0.05, 50.0])
+        default_factory=lambda: np.diag([0.05, 10.0])
     )  # input difference cost matrix, penalty for change of inputs - [accel, steering_speed]
     Qk: npt.NDArray = field(
-        default_factory=lambda: np.diag([5.0, 5.0, 10.0, 5.0])
+        default_factory=lambda: np.diag([5.0, 5.0, 10.0, 3.0])
     )  # state error cost matrix, for the the next (T) prediction time steps [x, y, v, yaw]
     Qfk: npt.NDArray = field(
-        default_factory=lambda: np.diag([15.0, 15.0, 10.0, 5.0])
+        default_factory=lambda: np.diag([20.0, 20.0, 10.0, 3.0])
     )  # final state error matrix, penalty  for the final state constraints: [x, y, v, yaw]
     # ---------------------------------------------------
 
@@ -79,6 +79,7 @@ class MPC(Node):
 
         # declare parameters
         self.sim = bool(self.declare_parameter("sim", True).value)
+        self.speed_factor = float(self.declare_parameter("speed_factor", 1.0).value)  # type: ignore
 
         # p ublishers and subscribers
         self.pub_drive = self.create_publisher(AckermannDriveStamped, "/drive", 1)
@@ -218,7 +219,7 @@ class MPC(Node):
 
         msg = AckermannDriveStamped()
         msg.drive.steering_angle = steer_output
-        msg.drive.speed = speed_output
+        msg.drive.speed = speed_output * self.speed_factor
         self.pub_drive.publish(msg)
 
     def mpc_prob_init(self):
