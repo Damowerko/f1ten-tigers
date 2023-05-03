@@ -79,6 +79,7 @@ class MPC(Node):
 
         # declare parameters
         self.sim = bool(self.declare_parameter("sim", True).value)
+        self.skir = bool(self.declare_parameter("skir", True).value)
         self.speed_factor = float(self.declare_parameter("speed_factor", 1.0).value)  # type: ignore
 
         # p ublishers and subscribers
@@ -108,9 +109,8 @@ class MPC(Node):
         self.chassis_slip_angle = 0.0
 
         # load waypoints assuming constant speed
-        waypoints_filename = (
-            get_package_share_directory("tigerstack") + "/maps/skir_6ay.csv"
-        )
+        
+        waypoints_filename = (get_package_share_directory("tigerstack") + "/maps/skir_6ay.csv") if self.skir else (get_package_share_directory("tigerstack") + "/maps/levine_planner.csv")
         self.static_waypoints = np.loadtxt(
             waypoints_filename, delimiter=";", dtype=float
         )
@@ -181,7 +181,7 @@ class MPC(Node):
             # visualize the waypoints
             visualize.points_to_line_marker(
                 self.trajectory[:, :2],
-                color=(0, 1, 0, 0.5),
+                color=(0, 0, 1, 0.5),
                 frame_id="map",
                 id=0,
                 ns="mpc",
@@ -220,6 +220,8 @@ class MPC(Node):
         msg = AckermannDriveStamped()
         msg.drive.steering_angle = steer_output
         msg.drive.speed = speed_output * self.speed_factor
+        # print("speed = {:.2f}".format(msg.drive.speed))
+        # self.get_logger().info("speed=%.3f"%msg.drive.speed)
         self.pub_drive.publish(msg)
 
     def mpc_prob_init(self):

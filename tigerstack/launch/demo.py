@@ -11,17 +11,24 @@ def generate_launch_description():
         "sim",
         default_value="True",
         description="Whether to run in simulation or not.",
-    )
+    )    
+    map_arg = DeclareLaunchArgument(
+        "skir",
+        default_value="False",
+        description="False to use levine map",
 
+    )
     return LaunchDescription(
         [
             sim_arg,
+            map_arg,
             Node(
                 package="tigerstack",
                 executable="mpc_node",
                 name="mpc_node",
                 parameters=[
                     {"sim": LaunchConfiguration("sim")},
+                    {"skir": LaunchConfiguration("skir")},
                 ],
             ),
             Node(
@@ -30,7 +37,7 @@ def generate_launch_description():
                 name="planner_node",
                 parameters=[
                     {"sim": LaunchConfiguration("sim")},
-                ],
+                ]
             ),
         ]
     )

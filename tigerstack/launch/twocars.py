@@ -11,6 +11,7 @@ def generate_launch_description():
         "sim",
         default_value="True",
         description="Whether to run in simulation or not.",
+
     )
 
     return LaunchDescription(
@@ -25,11 +26,11 @@ def generate_launch_description():
                 ],
             ),
             Node(
-                package="planner",
-                executable="planner_node",
-                name="planner_node",
+                package="pure_pursuit",
+                executable="pure_pursuit_node",
+                name="pure_pursuit_node",
                 parameters=[
-                    {"sim": LaunchConfiguration("sim")},
+                    {"oppon": True},
                 ],
             ),
         ]
