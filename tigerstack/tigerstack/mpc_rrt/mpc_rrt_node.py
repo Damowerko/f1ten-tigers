@@ -19,7 +19,7 @@ from tigerstack.mpc import visualize
 from tigerstack.mpc.utils import nearest_point
 from tigerstack.mpc.waypoints import trajectory_from_waypoints
 from visualization_msgs.msg import MarkerArray
-
+from std_msgs.msg import Bool
 
 @dataclass
 class mpc_config:
@@ -30,16 +30,16 @@ class mpc_config:
     # ---------------------------------------------------
     # TODO: you may need to tune the following matrices
     Rk: npt.NDArray = field(
-        default_factory=lambda: np.diag([0.01, 5.0])
+        default_factory=lambda: np.diag([0.01, 1.0])
     )  # input cost matrix, penalty for inputs - [accel, steering_speed]
     Rdk: npt.NDArray = field(
-        default_factory=lambda: np.diag([0.05, 50.0])
+        default_factory=lambda: np.diag([0.05, 10.0])
     )  # input difference cost matrix, penalty for change of inputs - [accel, steering_speed]
     Qk: npt.NDArray = field(
         default_factory=lambda: np.diag([5.0, 5.0, 10.0, 3.0])
     )  # state error cost matrix, for the the next (T) prediction time steps [x, y, v, yaw]
     Qfk: npt.NDArray = field(
-        default_factory=lambda: np.diag([10.0, 20.0, 10.0, 3.0])
+        default_factory=lambda: np.diag([20.0, 20.0, 10.0, 3.0])
     )  # final state error matrix, penalty  for the final state constraints: [x, y, v, yaw]
     # ---------------------------------------------------
 
@@ -79,6 +79,7 @@ class MPC(Node):
 
         # declare parameters
         self.sim = bool(self.declare_parameter("sim", True).value)
+        self.waypoints_file = self.declare_parameter("waypoints_file", "/maps/skir.csv").value
         self.speed_factor = float(self.declare_parameter("speed_factor", 1.0).value)  # type: ignore
 
         # p ublishers and subscribers
@@ -93,6 +94,11 @@ class MPC(Node):
         self.path_sub = self.create_subscription(
             Float32MultiArray, f"/path", self.path_callback, 1
         )
+        self.colission_sub = self.create_subscription(
+            Bool, "rrt/collision", self.collision_callback, 1
+        )
+
+        self.colission = False
         self.last_path_time = time.time()
 
         self.config = mpc_config()
@@ -109,8 +115,9 @@ class MPC(Node):
 
         # load waypoints assuming constant speed
         waypoints_filename = (
-            get_package_share_directory("tigerstack") + "/maps/skir_inner.csv"
+            get_package_share_directory("tigerstack") + self.waypoints_file
         )
+
         self.static_waypoints = np.loadtxt(
             waypoints_filename, delimiter=";", dtype=float
         )
@@ -126,12 +133,18 @@ class MPC(Node):
         waypoints = np.array(msg.data).reshape(-1, 7).astype(np.float64)
         self.update_trajectory(waypoints)
 
+    def collision_callback(self, msg : Bool):
+        self.colission = msg.data
+
     def update_trajectory(self, waypoints):
         self.trajectory = trajectory_from_waypoints(waypoints)
         self.lap_length = waypoints[-1, 0]
 
     def odom_callback(self, odom_msg: Odometry):
-        if not self.use_static_waypoints and time.time() - self.last_path_time > 1.0:
+
+        if self.colission:
+            return None
+        if not self.use_static_waypoints and time.time() - self.last_path_time > 0.2:
             self.get_logger().warn("Fallback to static waypoints!")
             self.use_static_waypoints = True
             self.update_trajectory(self.static_waypoints)

@@ -29,6 +29,10 @@ setup(
             "safety_node = tigerstack.safety_node:main",
             "imu_framer = tigerstack.imu_framer:main",
             "mpc_node = tigerstack.mpc.mpc_node:main",
+            "mpc_rrt_node = tigerstack.mpc_rrt.mpc_rrt_node:main",
+            "mpc_oppo = tigerstack.mpc_rrt.mpc_oppo:main",
+            "rrt_node = tigerstack.mpc_rrt.rrt_node:main",
+            "pure_pursuit = tigerstack.mpc_rrt.pure_pursuit:main",
         ],
     },
 )

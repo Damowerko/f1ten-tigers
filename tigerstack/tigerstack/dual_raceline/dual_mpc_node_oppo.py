@@ -75,17 +75,17 @@ class MPC(Node):
     """
 
     def __init__(self):
-        super().__init__("mpc_node")  # type: ignore
+        super().__init__("dual_mpc_node_oppo")  # type: ignore
 
         # declare parameters
         self.sim = bool(self.declare_parameter("sim", True).value)
-        self.speed_factor = float(self.declare_parameter("speed_factor", 1.0).value)  # type: ignore
+        self.speed_factor = float(self.declare_parameter("speed_factor", .8).value)  # type: ignore
 
         # p ublishers and subscribers
-        self.pub_drive = self.create_publisher(AckermannDriveStamped, "/drive", 1)
+        self.pub_drive = self.create_publisher(AckermannDriveStamped, "/opp_drive", 1)
         self.pub_visualize = self.create_publisher(MarkerArray, "~/visualize", 1)
 
-        odom_topic = "/ego_racecar/odom" if self.sim else "/pf/pose/odom"
+        odom_topic = "/opp_racecar/odom" if self.sim else "/pf/pose/odom"
         self.sub_odom = self.create_subscription(
             Odometry, odom_topic, self.odom_callback, 1
         )
@@ -109,7 +109,7 @@ class MPC(Node):
 
         # load waypoints assuming constant speed
         waypoints_filename = (
-            get_package_share_directory("tigerstack") + "/maps/skir_inner.csv"
+            get_package_share_directory("tigerstack") + "/maps/skir.csv"
         )
         self.static_waypoints = np.loadtxt(
             waypoints_filename, delimiter=";", dtype=float

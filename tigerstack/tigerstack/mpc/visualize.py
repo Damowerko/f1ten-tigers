@@ -64,7 +64,7 @@ def points_to_arrow_markers(
                 z=0.0,
             )
         )
-    marker.type = Marker.LINE_STRIP
+    marker.type = Marker.ARROW
     return marker
 
 

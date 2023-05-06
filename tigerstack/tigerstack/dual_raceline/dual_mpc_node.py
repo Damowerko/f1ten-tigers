@@ -86,8 +86,14 @@ class MPC(Node):
         self.pub_visualize = self.create_publisher(MarkerArray, "~/visualize", 1)
 
         odom_topic = "/ego_racecar/odom" if self.sim else "/pf/pose/odom"
+        odom_oppo_topic = "/ego_racecar/opp_odom" if self.sim else "/pf/pose/odom"
         self.sub_odom = self.create_subscription(
             Odometry, odom_topic, self.odom_callback, 1
+        )
+
+        self.oppo_position = None
+        self.sub_oppo_odom = self.create_subscription(
+            Odometry, odom_oppo_topic, self.oppo_odom_callback, 1
         )
 
         self.path_sub = self.create_subscription(
@@ -107,15 +113,39 @@ class MPC(Node):
         self.steering_angle = 0.0
         self.chassis_slip_angle = 0.0
 
+        #
+        self.overtake_threshold = 2.0
+        self.overtake_end_threshold = 3.0
+        self.overtake_mode = "center"
+        self.overtake_start = time.time()
+        self.overtake_min_time = 3.0
+        self.overtake_lookahead = 50
+        self.overtake_minimum_gap = .3
+
         # load waypoints assuming constant speed
-        waypoints_filename = (
+        waypoints_filename_center = (
+            get_package_share_directory("tigerstack") + "/maps/skir.csv"
+        )
+        waypoints_filename_inner = (
             get_package_share_directory("tigerstack") + "/maps/skir_inner.csv"
         )
-        self.static_waypoints = np.loadtxt(
-            waypoints_filename, delimiter=";", dtype=float
+        waypoints_filename_outer = (
+            get_package_share_directory("tigerstack") + "/maps/skir_outer4.csv"
         )
+        self.static_waypoints_center = np.loadtxt(
+            waypoints_filename_center, delimiter=";", dtype=float
+        )
+        self.static_waypoints_inner = np.loadtxt(
+            waypoints_filename_inner, delimiter=";", dtype=float
+        )
+        self.static_waypoints_outer = np.loadtxt(
+            waypoints_filename_outer, delimiter=";", dtype=float
+        )
+        self.center_trajectory = trajectory_from_waypoints(self.static_waypoints_center)
+        self.inner_trajectory = trajectory_from_waypoints(self.static_waypoints_inner)
+        self.outer_trajectory = trajectory_from_waypoints(self.static_waypoints_outer)
         self.use_static_waypoints = True
-        self.update_trajectory(self.static_waypoints)
+        self.update_trajectory(self.static_waypoints_center)
 
         # initialize MPC problem
         self.mpc_prob_init()
@@ -130,15 +160,106 @@ class MPC(Node):
         self.trajectory = trajectory_from_waypoints(waypoints)
         self.lap_length = waypoints[-1, 0]
 
+    def oppo_odom_callback(self, odom_msg: Odometry):
+        self.oppo_position = odom_msg.pose.pose.position
+
+    def determine_overtake_route(self, position, oppo_pos_2d):
+        _, _, _, nearest_idx_center = nearest_point(
+            np.array([position.x, position.y]), self.center_trajectory[:, :2]
+        )
+        _, _, _, nearest_idx_inner = nearest_point(
+            np.array([position.x, position.y]), self.inner_trajectory[:, :2]
+        )
+        _, _, _, nearest_idx_outer = nearest_point(
+            np.array([position.x, position.y]), self.outer_trajectory[:, :2]
+        )
+        center_rolled = np.roll(self.center_trajectory, -nearest_idx_center, axis=0)
+        inner_rolled = np.roll(self.inner_trajectory, -nearest_idx_inner, axis=0)
+        outer_rolled = np.roll(self.outer_trajectory, -nearest_idx_outer, axis=0)
+        #poses = np.repeat(oppo_pos_2d[None, ...], 10, axis=0)
+        #center_diff = np.linalg.norm(center_rolled[:10, :2] - poses, axis=1)
+        inner_diff = np.linalg.norm(inner_rolled[:self.overtake_lookahead, :2] - center_rolled[:self.overtake_lookahead, :2], axis=1)
+        outer_diff = np.linalg.norm(outer_rolled[:self.overtake_lookahead, :2] - center_rolled[:self.overtake_lookahead, :2], axis=1)
+        if(np.amin(inner_diff) > np.amin(outer_diff)):
+            return "inner"
+        else:
+            return "outer"
+
+    def determine_overtake_route_two(self, position, oppo_pos_2d):
+        _, _, _, nearest_idx_center = nearest_point(
+            np.array([position.x, position.y]), self.center_trajectory[:, :2]
+        )
+        center_rolled = np.roll(self.center_trajectory, -nearest_idx_center, axis=0)
+        poses = center_rolled[:self.overtake_lookahead, :2]
+        inner_points = np.empty(self.overtake_lookahead, dtype=np.int32)
+        outer_points = np.empty(self.overtake_lookahead, dtype=np.int32)
+        inner2d = self.inner_trajectory[:, :2]
+        outer2d = self.outer_trajectory[:, :2]
+        for i in range(len(poses)):
+            inner_points[i] = nearest_point(poses[i], inner2d)[3]
+            outer_points[i] = nearest_point(poses[i], outer2d)[3]
+
+        diffs_inner = np.linalg.norm(center_rolled[:self.overtake_lookahead, :2] - self.inner_trajectory[inner_points, :2], axis=1)
+        diffs_outer = np.linalg.norm(center_rolled[:self.overtake_lookahead, :2] - self.outer_trajectory[outer_points, :2], axis=1)
+        min_inner = np.amin(diffs_inner)
+        min_outer = np.amin(diffs_outer)
+        if min_inner> self.overtake_minimum_gap or min_outer > self.overtake_minimum_gap:
+            if(np.amin(diffs_inner) > np.amin(diffs_outer)):
+                print("selecting inner {}".format(np.amin(diffs_inner)))
+                return "inner"
+            else:
+                print("selecting outer {}".format(np.amin(diffs_outer)))
+                return "outer"
+        else:
+            print("waiting")
+            return "slow"
+
+
+    def check_overtake(self, position):
+        if self.oppo_position:
+            oppo_pos_2d = np.array((self.oppo_position.x, self.oppo_position.y))
+            dist = np.linalg.norm(np.array((position.x, position.y)) -oppo_pos_2d)
+            if dist < self.overtake_threshold:
+
+                if self.overtake_mode == "center":
+                    
+                    overtake_dir = self.determine_overtake_route_two(position, oppo_pos_2d)
+                    
+                    if overtake_dir == "slow":
+                        self.speed_factor = .8
+                    else:
+                        self.speed_factor = 1.0
+                        self.overtake_start = time.time()
+                        self.use_static_waypoints = True
+                        if overtake_dir == "outer":
+                            self.update_trajectory(self.static_waypoints_outer)
+                        else:
+                            self.update_trajectory(self.static_waypoints_inner)
+                        self.overtake_mode = overtake_dir
+
+            elif dist > self.overtake_end_threshold:
+                if time.time() - self.overtake_start > self.overtake_min_time:
+                    if self.overtake_mode == "outer" or self.overtake_mode == "inner":
+                        self.use_static_waypoints = True
+                        self.update_trajectory(self.static_waypoints_center)
+                        self.overtake_mode = "center"
+
     def odom_callback(self, odom_msg: Odometry):
-        if not self.use_static_waypoints and time.time() - self.last_path_time > 1.0:
-            self.get_logger().warn("Fallback to static waypoints!")
-            self.use_static_waypoints = True
-            self.update_trajectory(self.static_waypoints)
 
         position = odom_msg.pose.pose.position
         orientation = odom_msg.pose.pose.orientation
         velocity = odom_msg.twist.twist.linear
+
+
+        self.check_overtake(position)
+                           
+        if not self.use_static_waypoints and time.time() - self.last_path_time > 1.0:
+            self.get_logger().warn("Fallback to static waypoints!")
+            self.use_static_waypoints = True
+            self.update_trajectory(self.static_waypoints_center)
+            
+
+        
 
         self.velocity = velocity.x
         self.chassis_slip_angle = 0.0  # np.arctan2(velocity.y, velocity.x)
