@@ -23,7 +23,7 @@ def sequence_to_color(color: Sequence) -> ColorRGBA:
 
 
 def make_marker(
-    color=(1.0, 0.0, 0.0), frame_id="map", id=0, ns="default", lifetime=None
+    color=(1.0, 0.0, 0.0), frame_id="map", id=0, ns="default", lifetime=None, scale=0.05
 ):
     marker = Marker()
     marker.header.frame_id = frame_id
@@ -31,9 +31,9 @@ def make_marker(
     marker.ns = ns
     marker.action = Marker.ADD
     marker.color = sequence_to_color(color)
-    marker.scale.x = 0.05
-    marker.scale.y = 0.05
-    marker.scale.z = 0.05
+    marker.scale.x = scale
+    marker.scale.y = scale
+    marker.scale.z = scale
     if lifetime is not None:
         marker.lifetime.sec = int(lifetime)
         marker.lifetime.nanosec = int((lifetime - int(lifetime)) * 1e9)
