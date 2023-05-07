@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
-import math
-import time
-
 import numpy as np
 import rclpy
-from ackermann_msgs.msg import AckermannDrive, AckermannDriveStamped
+from ackermann_msgs.msg import AckermannDriveStamped
 from ament_index_python.packages import get_package_share_directory
 from graph_ltpl.Graph_LTPL import Graph_LTPL
 from nav_msgs.msg import Odometry
@@ -12,34 +9,8 @@ from rclpy.node import Node
 from scipy.spatial.transform import Rotation as R
 from sensor_msgs.msg import LaserScan
 from std_msgs.msg import Float32MultiArray
-from tf2_msgs.msg import TFMessage
-from tigerstack.mpc import visualize
-from tigerstack.mpc.visualize import points_to_arrow_markers
+from tigerstack.mpc.visualize import point_to_sphere_marker
 from visualization_msgs.msg import Marker, MarkerArray
-
-
-def waypoint2Marker(obstacles, timestamp, id=0.0, ns="ref", r=0.0, g=0.0, b=1.0):
-    marker = Marker()
-    marker.header.frame_id = "map"
-    marker.header.stamp = timestamp
-    marker.ns = ns
-    marker.id = id
-    marker.type = Marker.SPHERE
-    marker.action = Marker.ADD
-    marker.pose.position.x = obstacles[0]  # .astype(float)
-    marker.pose.position.y = obstacles[1]  # .astype(float)
-    marker.pose.position.z = 0.0
-    marker.scale.x = 0.2
-    marker.scale.y = 0.2
-    marker.scale.z = 0.1
-    marker.color.a = 0.5  # // Don't forget to set the alpha!
-    marker.color.r = r
-    marker.color.g = g
-    marker.color.b = b
-    # msg.markers.append(marker)
-    # self.publisher_marker.publish(marker)
-    return marker
-
 
 toppath = get_package_share_directory("planner")
 
@@ -65,11 +36,16 @@ class Planner(Node):
         self.sim = bool(self.declare_parameter("sim", True).value)
         self.brake = bool(self.declare_parameter("brake", False).value)
         self.safety_distance = float(
-            self.declare_parameter("safety_distance", 1.0).value
+            self.declare_parameter("safety_distance", 1.0).value  # type: ignore
         )
-        self.detection_method = self.declare_parameter(
-            "obstacle_method", "downsample"
-        ).value
+        self.detection_method = str(
+            self.declare_parameter("obstacle_method", "downsample").value
+        )
+
+        if self.detection_method == "sim" and not self.sim:
+            raise ValueError(
+                "Obstacle detection method is set to 'sim' but sim is set to False."
+            )
 
         # self.timer = self.create_timer(0.05, self.timer_callback)
         self.publisher_array = self.create_publisher(Float32MultiArray, "/path", 1)
@@ -78,6 +54,12 @@ class Planner(Node):
         self.sub_odom = self.create_subscription(
             Odometry, odom_topic, self.odom_callback, 1
         )
+
+        if self.sim:
+            self.opponent_position = np.array([0.0, 0.0])
+            self.opponent_topic = self.create_subscription(
+                Odometry, "/ego_racecar/opp_odom", self.opponent_callback, 1
+            )
 
         self.sub_scan = self.create_subscription(
             LaserScan, "/scan", self.scan_callback, 1
@@ -119,6 +101,18 @@ class Planner(Node):
         self.velocity = odom_msg.twist.twist.linear.x
         # self.flag_brake=False if self.velocity<0.1 else True
         self.heading = (
+            R.from_quat(
+                [orientation.x, orientation.y, orientation.z, orientation.w]
+            ).as_euler("xyz")[2]
+            - np.pi / 2
+        )
+
+    def opponent_callback(self, odom_msg: Odometry):
+        position = odom_msg.pose.pose.position
+        orientation = odom_msg.pose.pose.orientation
+        self.opponent_position = np.array([position.x, position.y])
+        self.opponent_velocity = odom_msg.twist.twist.linear.x
+        self.opponent_heading = (
             R.from_quat(
                 [orientation.x, orientation.y, orientation.z, orientation.w]
             ).as_euler("xyz")[2]
@@ -169,7 +163,18 @@ class Planner(Node):
         # clear obstacles
         self.obstacles = []
         if self.detection_method == "sim":
-            pass
+            self.obstacles = [
+                {
+                    "id": 0,  # integer id of the object
+                    "type": "physical",  # type 'physical' (only class implemented so far)
+                    "X": self.opponent_position[0],  # x coordinate
+                    "Y": self.opponent_position[1],  # y coordinate
+                    "theta": self.opponent_heading,  # orientation (north = 0.0)
+                    "v": self.opponent_velocity,  # velocity along theta
+                    "length": 0.3,  # length of the object
+                    "width": 0.3,  # width of the object
+                }
+            ]
         elif self.detection_method == "downsample":
             scan_positions = self.scan_to_positions(self.position, ranges, angles)
             for i in range(0, len(scan_positions), self.filter_width):
@@ -250,7 +255,10 @@ class Planner(Node):
             raise NotImplementedError()  # TODO: merge into this branch
         elif self.detection_method == "peak":
             raise NotImplementedError()  # TODO: merge into this branch
+        else:
+            raise ValueError(f"Unknown detection method {self.detection_method}.")
 
+        self.visualize_obstacles()
         self.timer_callback()
 
     def select_action(self, trajectory_set):
@@ -264,27 +272,27 @@ class Planner(Node):
                 return selected_action
         raise RuntimeError("No action found.")
 
-    def get_objects(self):
-        # return []
-        obs_list = []
-        for obs in self.obstacles:
-            obs_list.append([obs["X"], obs["Y"]])
-        marker_array_msg = MarkerArray()
+    def visualize_obstacles(self):
+        # delete all markers in namespace 'planner'
         marker = Marker()
         marker.id = 0
         marker.ns = "planner"
         marker.action = Marker.DELETEALL
-        marker_array_msg.markers.append(marker)
-        self.pub_obs.publish(marker_array_msg)
         msg = MarkerArray()
-        id = 0
-        for obs in obs_list:
-            # self.get_logger().info("visualizeWaypoints")
-            timestamp = self.get_clock().now().to_msg()
-            marker = waypoint2Marker(obs, timestamp, id, "planner", 0.8, 0.0, 0.8)
-            id += 1
+        msg.markers = [marker]
+        self.pub_obs.publish(msg)
+
+        msg = MarkerArray()
+        msg.markers = []
+        for id, obstacle in enumerate(self.obstacles):
+            position = np.array([obstacle["X"], obstacle["Y"]])
+            marker = point_to_sphere_marker(
+                position, ns="planner", id=id, color=(0.8, 0.0, 0.8), scale=0.3, msg=msg
+            )
             msg.markers.append(marker)
         self.pub_obs.publish(msg)
+
+    def get_objects(self):
         return self.obstacles
 
     def timer_callback(self):
